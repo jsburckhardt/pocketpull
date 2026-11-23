@@ -29,16 +29,24 @@ class WorkspaceContract(unittest.TestCase):
         self.assertEqual(len(mounts), 4)
         for mount in mounts:
             self.assertNotIn("docker.sock", mount)
-        for key in ("containerEnv", "remoteEnv"):
-            self.assertFalse(any(
-                name.startswith(("OTEL_", "COPILOT_OTEL_"))
-                for name in self.config.get(key, {})
-            ))
         self.assertEqual(
             self.config["postCreateCommand"], "bash .devcontainer/post-create.sh"
         )
         self.assertNotIn("postStartCommand", self.config)
         self.assertNotIn("postAttachCommand", self.config)
+
+    def test_optional_metadata_only_telemetry(self):
+        self.assertEqual(self.config["remoteEnv"], {
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "${localEnv:OTEL_EXPORTER_OTLP_ENDPOINT}",
+            "OTEL_EXPORTER_OTLP_HEADERS": "${localEnv:OTEL_EXPORTER_OTLP_HEADERS}",
+            "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+            "OTEL_INSTRUMENTATION_GENAI_CAPTURE_CONTENT": "NO_CONTENT",
+        })
+        self.assertFalse(any(
+            name.startswith(("OTEL_", "COPILOT_OTEL_"))
+            for name in self.config["containerEnv"]
+        ))
+        self.assertIn(".env", (ROOT / ".gitignore").read_text().splitlines())
 
     def test_feature_lock_and_exact_versions(self):
         lock = json.loads((ROOT / ".devcontainer/devcontainer-lock.json").read_text())

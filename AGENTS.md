@@ -20,6 +20,7 @@ Skills: `.github/skills/`. Use them in this order:
 - `devcontainer up --workspace-folder .`: start the non-root workspace (requires host `~/.ssh`).
 - `devcontainer exec --workspace-folder . just dev-smoke`: exercise installed tools, user, mounts and shell history.
 - `just dev-signing-smoke`: host-only disposable-key devcontainer integration; verifies SSH-signed commits through the read-only SSH mount and cleans up its own resources.
+- `devcontainer exec --workspace-folder . just dev-telemetry-smoke`: authenticated, container-only clean-profile Copilot/loopback OTLP protobuf check; currently fails on pinned Copilot's `enduser.pseudo.id` privacy blocker (see README).
 
-See README.md for development authentication/signing, scope boundaries and prerequisite details. No collector/application checks exist yet. Telemetry remains unconfigured pending T2 of #2.
+See README.md for development authentication/signing, optional external telemetry, scope boundaries and prerequisites. No collector/application checks exist. Telemetry is off without a supplied endpoint; external use remains blocked pending the T2 privacy decision in #2.
 <!-- soft-factory-v2:end -->
