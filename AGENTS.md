@@ -15,5 +15,11 @@ Skills: `.github/skills/`. Use them in this order:
 - When a task introduces or changes build/test/lint commands, update `## Commands` in the same task.
 
 ## Commands
-None yet.
+- `just dev-check`: host/container configuration, feature-lock, shell-syntax and recipe checks.
+- `devcontainer build --workspace-folder .`: build the pinned Ubuntu workspace.
+- `devcontainer up --workspace-folder .`: start the non-root workspace (requires host `~/.ssh`).
+- `devcontainer exec --workspace-folder . just dev-smoke`: exercise installed tools, user, mounts and shell history.
+- `just dev-signing-smoke`: host-only disposable-key devcontainer integration; verifies SSH-signed commits through the read-only SSH mount and cleans up its own resources.
+
+See README.md for development authentication/signing, scope boundaries and prerequisite details. No collector/application checks exist yet. Telemetry remains unconfigured pending T2 of #2.
 <!-- soft-factory-v2:end -->
