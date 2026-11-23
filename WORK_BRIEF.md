@@ -133,13 +133,13 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T4; Lead owns final evidence/publication in this brief and PR
 - Resources: Fault-injected loopback HTTP fixtures on OS-assigned ports; temporary state/raw/build directories and identified subprocesses only
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: in-progress
-- Worker: factory/collector-t4; base 31fea616b683b02a24e5f473fffb4d04aa4af78f; head pending; PID 36732 in devcontainer 43753475d620; log .trees/collector-t4.log
+- Status: integrated
+- Worker: factory/collector-t4; base 31fea616b683b02a24e5f473fffb4d04aa4af78f; accepted head 959ee294abf8dc40895a66b3da1f3ca0c8dd95c1; integrated unchanged as 8d13fec8c82e8c65d7e45e450863d49995a2c043; PID 36732 exited; log .trees/collector-t4.log
 
 ## Status
-delivering
+review
 
-Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and development AC9 remain exclusively in #2, merged by #3 at 548d269e38b3f332c8d4bbf2b4fc3870f8362630. Lead session: c5fac65e-0ea9-4288-aa93-7440ab7136d6. Integration branch: delivery/1-collector. Start with T1; unlock each dependant only after independent task acceptance, serial integration and combined checks. One final accepted PR targets main; the owner merges/releases.
+Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and development AC9 remain exclusively in #2, merged by #3 at 548d269e38b3f332c8d4bbf2b4fc3870f8362630. Lead session: c5fac65e-0ea9-4288-aa93-7440ab7136d6. Integration branch: delivery/1-collector. T1-T4 are independently accepted and integrated; T3's sole major finding was corrected and freshly accepted before integration. Current combined checks pass. Final independent acceptance must cover the exact combined SHA before one PR targets main; its verdict and publication evidence belong in that PR without a post-review commit changing the accepted head. The owner merges/releases. Fixture delivery is not a live Pocket pilot or release.
 
 ## Acceptance evidence
 ### T1 independent task acceptance
@@ -170,3 +170,10 @@ Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and devel
 - AC5/AC9/AC2/AC6: previous independent evidence remains valid; current combined regressions pass. Complete issue resilience remains T4-owned.
 - Reviewer checks: just collector-check; just collector-smoke; just dev-check; focused expanded-snapshot/freshness/unusable-state race tests with -count=1; git diff --check. All exit 0 in non-root devcontainer; exact clean head verified.
 - Lead integrated both unchanged reviewed commits serially as c5e0ed2e86610890a91920422b1c59f58d5eb6d4 and d5e48dfbc41d6fd2cfe880a78ff05265dffc3f00, then just collector-check; just collector-smoke; just dev-check all exit 0. Worker signatures verified; no surviving correction PGID 32602. T4 unlocked.
+
+### T4 independent task acceptance
+- Verdict: pass. Reviewer: fresh-context accept-collector-t4, factory-accept/factory-design; no repairs, commits or record edits.
+- Base: 31fea616b683b02a24e5f473fffb4d04aa4af78f. Reviewed head: 959ee294abf8dc40895a66b3da1f3ca0c8dd95c1. Integration: 8d13fec8c82e8c65d7e45e450863d49995a2c043.
+- AC1: CGO-free Linux amd64/arm64 builds/native fixture smokes pass. AC2: strict config/authentication/redaction regressions unchanged and pass. AC3: thousand-record/freshness recovery and expanded snapshot pass. AC4: complete atomic changed-only data/failure preservation/no-pruning pass. AC5: four attempts, 500ms/1s/2s backoff, capped cancelable 10s Retry-After and 30s attempt/body timeouts; auth/permanent stops, partial progress, final-cache cancellation and native signal/lock/restart pass. AC6: truthful counts, redacted JSON/text/severity logs/run context/retry metadata and empty stdout pass. AC9: completed documentation accurately matches numeric bounds, count meanings, config/secrets/cron/artifacts/state/recovery.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; go test -race -count=1 ./internal/cli ./internal/collector; git diff --check. All exit 0 non-root; exact clean scoped head verified. Findings: none.
+- Lead combined checks after exact serial cherry-pick: just collector-check; just collector-smoke; just dev-check all exit 0. Application/tests/docs tree equals accepted worker tree exactly (only Lead-owned WORK_BRIEF.md differs). Signed worker head verified; no surviving PGID 36732. All tasks complete; request independent final combined-SHA acceptance.
