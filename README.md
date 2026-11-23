@@ -4,6 +4,102 @@ Scheduled Pocket transcript collector.
 
 Delivery skills in `.github/skills/` are vendored from jsburckhardt/toolio `soft-factory-v2` at `3d07eb5`.
 
+## Collector: current T1 thin path
+
+`pocketpull` is a native run-once Go CLI, not a scheduler. It lists every account
+page from `https://public.heypocketai.com/api/v1/public/recordings?page=1&limit=100`,
+increments `page` while `pagination.has_more` is true, deduplicates IDs, and
+fetches `/public/recordings/<id>` with Bearer authentication. Details include
+transcript and summarizations by the API's defaults. No audio route, date/tag
+filter, extra content service, remote edit, or local pruning is used.
+
+Build into a temporary directory and invoke with an explicitly exported secret:
+
+```sh
+build_dir="$(mktemp -d)"
+trap 'rm -f -- "$build_dir/pocketpull"; rmdir -- "$build_dir"' EXIT
+CGO_ENABLED=0 go build -o "$build_dir/pocketpull" ./cmd/pocketpull
+"$build_dir/pocketpull" --help
+"$build_dir/pocketpull" --version
+# Bash: supply your key without placing it in shell history.
+read -r -s -p 'Pocket API key: ' POCKETPULL_API_KEY
+printf '\n'
+export POCKETPULL_API_KEY
+"$build_dir/pocketpull" --raw-dir "$HOME/pocket-raw"
+unset POCKETPULL_API_KEY
+```
+
+`--raw-dir` is required; relative paths resolve against the current directory.
+T1 accepts credentials **only** through `POCKETPULL_API_KEY`. It does not load
+`.env` or YAML, and has no literal-key flag, secret-file flag, or public API
+endpoint override. Keep secrets out of command arguments, tracked files and
+image layers. Help/version do not require credentials or perform collection;
+the unversioned development build reports `pocketpull dev`.
+
+Each snapshot is `<raw-dir>/<recording-id>/recording.json`: the **entire detail
+`data` object**, not its envelope. Unknown fields and exact large JSON integers
+survive alongside segments, speakers, timing, tags and API-provided summaries.
+IDs must be 1–255 ASCII characters, start with a letter/digit, and thereafter
+contain only letters/digits, dots, underscores or hyphens. Unsafe IDs and
+mismatched detail IDs fail before snapshot writes. Recording-folder symlinks
+are rejected. New directories are owner-only and new snapshot files are mode
+0600; run the downstream consumer as the same user or explicitly arrange access.
+
+Changed content replaces the previous file with a synced, same-directory
+temporary file and atomic rename. Equivalent JSON (including reordered keys,
+whitespace and numeric spelling) is not rewritten. Invalid/failed responses
+and unsuccessful writes retain prior snapshots; remote absence/404 never
+removes them. Valid missing/null transcript data is pending, not an error.
+T1 refetches every listed ID on **every run**, including pending recordings.
+There is no state/cache or 24-hour refresh policy yet: an upstream edit is
+visible after the next successful fetch, normally within the cron interval
+plus run time. There are no retries or overlap lock yet; run serially.
+Requests have a 30-second timeout and a 32 MiB response limit; oversized
+responses fail without replacing prior data. HTTP redirects are not followed.
+
+JSON `slog` operational logs go to stderr; collection stdout remains empty.
+Events include a run ID, recording ID where safe, and a final summary with
+`elapsed_ms`. `discovered` counts unique safe IDs visited, `fetched` counts
+successfully validated and stored/unchanged details, `unchanged` is a subset
+of `fetched`, and `pending` counts fetched records with missing/null transcript.
+`failed` counts failed listing/detail/storage work or rejected IDs; `cached`
+and `retries` are zero in T1. Logs exclude titles, transcript/summary content,
+HTTP bodies, headers, keys, URLs and raw transport/filesystem errors.
+Individual detail failures retain partial progress and exit nonzero; 401/403
+stop promptly. Exit zero includes valid pending records, not necessarily
+finished upstream transcripts. Text/severity selection and comprehensive
+interruption/retry handling remain later slices.
+
+For cron, install the binary at a stable absolute path yourself. Until T2 adds
+the recommended owner-only API-key-file option, a provisioned owner-only
+`/home/collector/.config/pocketpull/cron-env` shell file may **explicitly export**
+`POCKETPULL_API_KEY`. It is a secret supplied by your secret workflow, not a
+repository file or automatically loaded configuration. Example crontab (hourly,
+with external nonwaiting `flock` while the native overlap lock is not yet built):
+
+```cron
+15 * * * * /usr/bin/flock -n /home/collector/.config/pocketpull/cron.lock /bin/sh -c '. /home/collector/.config/pocketpull/cron-env && exec /usr/local/bin/pocketpull --raw-dir /home/collector/pocket-raw' 2>>/home/collector/pocketpull.log
+```
+
+Create the parent directories and provision the secret before enabling this
+example; do not share that lock across unrelated raw directories. Cron and
+external tooling own scheduling and log rotation. There is no application log
+manager or telemetry exporter. Strict YAML configuration/secret files (T2),
+private freshness state/native locking and thousand-record evidence (T3),
+and bounded retries/fault handling/final logging coverage (T4) are not claimed.
+
+```sh
+just collector-check
+just collector-smoke
+```
+
+These use synthetic loopback HTTP fixtures and temporary output only.
+`collector-check` rejects unformatted Go (it does not silently format), runs
+vet/race tests, and builds CGO-free Linux amd64 and arm64 binaries with no
+installed application runtime requirement. `collector-smoke` runs a native
+subprocess through the real CLI entry using an internal, test-only fixture seam;
+neither command contacts Pocket or needs real credentials.
+
 ## Development workspace
 
 Use Docker and the [Dev Container CLI](https://github.com/devcontainers/cli)

@@ -15,6 +15,8 @@ Skills: `.github/skills/`. Use them in this order:
 - When a task introduces or changes build/test/lint commands, update `## Commands` in the same task.
 
 ## Commands
+- `just collector-check`: reject unformatted Go, run `go vet` and `go test -race`, and build CGO-free Linux amd64/arm64 binaries in a cleaned temporary directory.
+- `just collector-smoke`: native CLI subprocess collects one recording from a loopback HTTP fixture, without real credentials.
 - `just dev-check`: host/container configuration, feature-lock, shell-syntax and recipe checks.
 - `devcontainer build --workspace-folder .`: build the pinned Ubuntu workspace.
 - `devcontainer up --workspace-folder .`: start the non-root workspace (requires host `~/.ssh`).
@@ -22,5 +24,5 @@ Skills: `.github/skills/`. Use them in this order:
 - `just dev-signing-smoke`: host-only disposable-key devcontainer integration; verifies SSH-signed commits through the read-only SSH mount and cleans up its own resources.
 - `devcontainer exec --workspace-folder . just dev-telemetry-smoke`: authenticated, container-only clean-profile Copilot/loopback OTLP protobuf check; permits only the automatic `enduser.pseudo.id` identity field and rejects other identity/content capture (see README).
 
-See README.md for development authentication/signing, optional external telemetry, scope boundaries and prerequisites. No collector/application checks exist. Telemetry is off without a supplied endpoint. Under #2 D21, only automatic `enduser.pseudo.id` is permitted; it can correlate sessions and is not assumed anonymous. Keep identity/content capture disabled; all other enduser fields, names, raw IDs and OS/host identity remain prohibited.
+See README.md for collector usage, development authentication/signing, optional external telemetry, scope boundaries and prerequisites. Collector checks currently demonstrate the T1 thin path, not full collector acceptance. Telemetry is off without a supplied endpoint. Under #2 D21, only automatic `enduser.pseudo.id` is permitted; it can correlate sessions and is not assumed anonymous. Keep identity/content capture disabled; all other enduser fields, names, raw IDs and OS/host identity remain prohibited.
 <!-- soft-factory-v2:end -->
