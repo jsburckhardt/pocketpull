@@ -100,8 +100,8 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, go.mod, go.sum, justfile, AGENTS.md, README.md owned by T1 until integration, then transferred serially to its dependant
 - Resources: Loopback HTTP fixture on an OS-assigned port; temporary raw/test/build directories only
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: in-progress
-- Worker: factory/collector-t1; base 08773f6427fc2a5ace2d5b70888ed23f74193a96; head pending; PID 887 in devcontainer 43753475d620; log .trees/collector-t1.log
+- Status: integrated
+- Worker: factory/collector-t1; base 08773f6427fc2a5ace2d5b70888ed23f74193a96; accepted head 0cbe3da4421708372e41081a139cf85bcecb8aad; integrated as 8c30365da87c333b68aea753fe475533cbaab719; PID 887 exited; log .trees/collector-t1.log
 
 ### T2 Config-driven and cron-safe collection with strict secret handling
 - ACs: AC2, AC6, AC9; AC1, AC4, AC5 regression
@@ -111,7 +111,7 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, go.mod, go.sum, justfile, AGENTS.md, README.md owned by T2 until integration, then transferred serially to its dependant
 - Resources: Loopback HTTP fixture on an OS-assigned port; temporary config/secret/raw directories only
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: blocked
+- Status: ready
 - Worker: None
 
 ### T3 Thousand-record repeated collections refresh safely without overlap
@@ -140,3 +140,12 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 delivering
 
 Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and development AC9 remain exclusively in #2, merged by #3 at 548d269e38b3f332c8d4bbf2b4fc3870f8362630. Lead session: c5fac65e-0ea9-4288-aa93-7440ab7136d6. Integration branch: delivery/1-collector. Start with T1; unlock each dependant only after independent task acceptance, serial integration and combined checks. One final accepted PR targets main; the owner merges/releases.
+
+## Acceptance evidence
+### T1 independent task acceptance
+- Verdict: pass for T1-owned portions only; complete issue acceptance remains pending T2-T4.
+- Reviewer: fresh-context accept-collector-t1, factory-accept/factory-design; no repairs or builder self-certification.
+- Base: 08773f6427fc2a5ace2d5b70888ed23f74193a96. Reviewed head: 0cbe3da4421708372e41081a139cf85bcecb8aad. Integration: 8c30365da87c333b68aea753fe475533cbaab719.
+- AC1: both CGO-free target builds, native fixture subprocess and application help/version pass. AC3: multipage deduplication/immediate details pass; cache/1,000-record evidence deferred. AC4: lossless complete data, safe folders, changed-only atomic writes and failure preservation pass. AC5: partial progress/auth-stop/pending/cancellation cases pass; locks/retries deferred. AC6: redacted JSON stderr, empty stdout and summary pass; full formats/severities deferred. AC9: current behavior documented with explicit limitations; complete configuration/cache/retries deferred.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; go test -race -count=1 ./...; credential-free native help/version. All exit 0 in the non-root devcontainer. Findings: none.
+- Lead combined checks after exact serial cherry-pick: just collector-check; just collector-smoke; just dev-check. All exit 0. Signed worker commit verified; no surviving processes in PGID 887. T2 unlocked.
