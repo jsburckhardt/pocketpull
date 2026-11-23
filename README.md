@@ -97,6 +97,15 @@ does not forward an SSH agent or weaken signing when a key is unavailable.
 Do not try to chmod or rewrite keys from the read-only container mount.
 After making a signed commit, `git verify-commit HEAD` verifies it locally.
 
+Repository-local signing settings override global settings. If the shared
+checkout already selects an agent-backed public key, use a command-scoped
+private-key path inside the container rather than changing the host checkout's
+Git configuration (replace the example key filename):
+
+```sh
+git -c user.signingkey="$HOME/.ssh/id_ed25519" commit
+```
+
 ### Workspace checks without real credentials
 
 Run `just dev-check` on the host (Python 3 and just required) or in the container
