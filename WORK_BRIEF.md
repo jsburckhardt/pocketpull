@@ -122,8 +122,8 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T3 until integration, then transferred serially to its dependant
 - Resources: Loopback HTTP fixtures on OS-assigned ports; independent temporary state/raw directories and subprocesses; no production archive
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: in-progress
-- Worker: factory/collector-t3; base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; head pending; PID 27136 in devcontainer 43753475d620; log .trees/collector-t3.log
+- Status: failed
+- Worker: factory/collector-t3; base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; rejected head c00750a4ab07ca733372e6ffea0f3f79acc6a3d0; PID 27136 exited; correction pending; log .trees/collector-t3.log
 
 ### T4 Interrupted and failing runs retain progress and report a complete operational outcome
 - ACs: AC1, AC2, AC3, AC4, AC5, AC6, AC9 (complete final coverage)
@@ -157,3 +157,9 @@ Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and devel
 - AC2: single strict YAML discovery/precedence/path/type/default validation, help/version bypass, nonempty unique credential source and owner-only regular secret files pass. AC6: JSON/text/severity options and malicious-input/transport/content redaction pass. AC9: executable config/secret examples and accurate cron/limits documentation pass. AC1/AC4/AC5: native builds/smokes and snapshot/partial-progress regressions pass.
 - Reviewer checks: just collector-check; just collector-smoke; just dev-check; go test -race -count=1 ./...; git diff --check. All exit 0 in non-root devcontainer; exact clean head verified. Findings: none.
 - Lead combined checks after exact serial cherry-pick: just collector-check; just collector-smoke; just dev-check. All exit 0. Signed worker head verified; no surviving processes in PGID 21922. T3 unlocked.
+
+### T3 initial independent task rejection
+- Verdict: fail. Reviewer: fresh-context accept-collector-t3, factory-accept/factory-design. Base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; reviewed head c00750a4ab07ca733372e6ffea0f3f79acc6a3d0. Not integrated; T4 remains blocked.
+- F1 (major, implementation): internal/collector/snapshot.go:31-36 and state.go:161,191 reuse the 32 MiB HTTP-response limit for indented raw snapshots. A valid 10,000,064-byte response writes a 35,000,057-byte snapshot; subsequent fresh and zero-refresh runs fail with prior snapshot unreadable. Raw readers must accommodate every accepted writer output, preserving semantic unchanged detection and prior-file safety.
+- AC3/AC4 fail due to F1. T3-owned AC5/AC9/AC2/AC6 pass: canonical namespaces, safe state, native overlap/alias/different-state/SIGKILL recovery and documentation/logging verified.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; git diff --check all exit 0; independent native loopback compact-response/expanded-output fixture reproduces F1. Exact worktree remained clean; scratch removed. Narrow correction requires regression, current checks and fresh acceptance of corrected exact head.
