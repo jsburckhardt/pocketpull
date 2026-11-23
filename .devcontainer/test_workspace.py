@@ -3,6 +3,7 @@
 
 import json
 from pathlib import Path
+import runpy
 import subprocess
 import unittest
 
@@ -57,6 +58,33 @@ class WorkspaceContract(unittest.TestCase):
             self.assertIn("@sha256:", resolved["resolved"])
             if "version" in options:
                 self.assertRegex(options["version"], r"^\d+\.\d+\.\d+$")
+
+    def test_pseudonymous_exception_is_exact(self):
+        telemetry = runpy.run_path(str(ROOT / ".devcontainer/telemetry-smoke.py"))
+        for key in (
+            "enduser.pseudo.id", "enduser.id", "enduser.pseudo.id.extra",
+            "enduser.pseudo.id\n", "enduser.id\n", "enduser.\nid",
+        ):
+            with self.subTest(key=key):
+                encoded = key.encode()
+                values = set(telemetry["strings"](b"\x0a" + bytes([len(encoded)]) + encoded))
+                self.assertIn(key, values)
+                self.assertEqual(
+                    key in telemetry["prohibited_attributes"](values),
+                    key != "enduser.pseudo.id",
+                )
+
+    def test_other_identity_and_content_stay_rejected(self):
+        telemetry = runpy.run_path(str(ROOT / ".devcontainer/telemetry-smoke.py"))
+        prohibited = {
+            "user.name", "user.id", "process.user.name", "host.name",
+            "enduser.future.field", "gen_ai.input.messages", "gen_ai.output.messages",
+            "gen_ai.tool.call.arguments", "gen_ai.tool.call.result",
+        }
+        permitted = {"enduser.pseudo.id", "gen_ai.request.model", "github.copilot"}
+        self.assertEqual(
+            telemetry["prohibited_attributes"](prohibited | permitted), prohibited
+        )
 
     def test_shell_syntax_and_recipes(self):
         for script in sorted((ROOT / ".devcontainer").glob("*.sh")):

@@ -75,6 +75,21 @@ def strings(data):
                 pass
 
 
+def prohibited_attributes(values):
+    forbidden = re.compile(
+        r"^(user\.name|user\.id|process\.user\.name|host\.name|"
+        r"gen_ai\.(input\.messages|output\.messages|"
+        r"system_instructions|prompt|completion|tool\.(call\.arguments|"
+        r"call\.result|definitions)).*|.*(?:tool_arguments|tool_output|"
+        r"policy_detail|policy\.details).*)$"
+    )
+    return {
+        value for value in values
+        if (value.startswith("enduser.") and value != "enduser.pseudo.id")
+        or forbidden.fullmatch(value)
+    }
+
+
 def signal_count(path, data):
     count = 0
     for resource in messages(fields(data), 1):
@@ -233,13 +248,6 @@ def main():
 
             totals = {"/v1/traces": 0, "/v1/metrics": 0}
             leaked = set()
-            forbidden = re.compile(
-                r"^(user\.name|user\.id|process\.user\.name|host\.name|"
-                r"enduser\.(?!pseudo\.id$).*|gen_ai\.(input\.messages|output\.messages|"
-                r"system_instructions|prompt|completion|tool\.(call\.arguments|"
-                r"call\.result|definitions)).*|.*(?:tool_arguments|tool_output|"
-                r"policy_detail|policy\.details).*)$"
-            )
             for path, headers, body in records:
                 assert path in totals, f"Unexpected OTLP path: {path}"
                 headers = {key.lower(): value for key, value in headers.items()}
@@ -254,7 +262,7 @@ def main():
                 assert response_marker.encode() not in body, "Response content exported"
                 values = set(strings(body))
                 assert "github.copilot" in values, "Missing actual Copilot scope"
-                leaked.update(value for value in values if forbidden.fullmatch(value))
+                leaked.update(prohibited_attributes(values))
                 assert not any("execute_tool" in value for value in values), (
                     "Unexpected tool execution during synthetic check"
                 )
