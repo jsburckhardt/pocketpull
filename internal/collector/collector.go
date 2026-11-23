@@ -12,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 type Options struct {
@@ -20,6 +21,9 @@ type Options struct {
 	BaseURL string
 	Client  *http.Client
 	Log     *slog.Logger
+	// StateDir and RefreshAfter are validated by the CLI; T3 enables their use.
+	StateDir     string
+	RefreshAfter time.Duration
 }
 
 type Summary struct {
@@ -58,6 +62,7 @@ func Run(ctx context.Context, options Options) (Summary, error) {
 	options.Client = &client
 	seen := make(map[string]bool)
 	for page := 1; ; page++ {
+		options.Log.Debug("listing page", "event", "page_requested", "page", page)
 		body, err := request(ctx, options, "/public/recordings?page="+strconv.Itoa(page)+"&limit=100")
 		if err != nil {
 			summary.Failed++

@@ -4,7 +4,7 @@ Scheduled Pocket transcript collector.
 
 Delivery skills in `.github/skills/` are vendored from jsburckhardt/toolio `soft-factory-v2` at `3d07eb5`.
 
-## Collector: current T1 thin path
+## Collector: current T2 configuration and collection
 
 `pocketpull` is a native run-once Go CLI, not a scheduler. It lists every account
 page from `https://public.heypocketai.com/api/v1/public/recordings?page=1&limit=100`,
@@ -29,12 +29,68 @@ export POCKETPULL_API_KEY
 unset POCKETPULL_API_KEY
 ```
 
-`--raw-dir` is required; relative paths resolve against the current directory.
-T1 accepts credentials **only** through `POCKETPULL_API_KEY`. It does not load
-`.env` or YAML, and has no literal-key flag, secret-file flag, or public API
-endpoint override. Keep secrets out of command arguments, tracked files and
-image layers. Help/version do not require credentials or perform collection;
-the unversioned development build reports `pocketpull dev`.
+### Configuration and credentials
+
+The public collection flags are `--config`, `--raw-dir`, `--api-key-file`,
+`--state-dir`, `--refresh-after`, `--log-format`, and `--log-level`. Help/version
+read no configuration or credentials and send no requests; the unversioned
+development build reports `pocketpull dev`. There is no literal-key flag or
+public API endpoint override.
+
+Select **exactly one** configuration file: explicit `--config FILE`, otherwise
+`./pocketpull.yaml`, otherwise `$XDG_CONFIG_HOME/pocketpull/config.yaml`
+(or `$HOME/.config/pocketpull/config.yaml` when the XDG base is unset/empty).
+No files are merged. A missing explicit file is an error. An unreadable or
+invalid selected/discovered file is an error, never permission to fall back.
+If neither discovery file exists, flags and defaults may supply configuration.
+Explicit flags override the selected file, including `--refresh-after 0`.
+File-configured paths resolve against that file's directory; CLI paths resolve
+against the working directory. Paths are not shell-expanded: use absolute paths
+or relative paths, not literal `~` or `$HOME` inside YAML.
+
+YAML must be one strict mapping/document with only these six keys:
+
+```yaml
+raw_dir: ../../pocket-raw
+api_key_file: api-key
+state_dir: ../../.local/state/pocketpull
+refresh_after: 24h
+log_format: json
+log_level: info
+```
+
+These example paths assume the file is in `$HOME/.config/pocketpull/`.
+[`examples/pocketpull.yaml`](examples/pocketpull.yaml) is a copyable version.
+All supplied values must be nonempty strings; unknown/duplicate keys, multiple
+documents, malformed YAML, aliases and incorrect types are rejected, even when
+a CLI override would replace an invalid file value. `raw_dir` is mandatory:
+there is no implicit output folder. `refresh_after` defaults to `24h` and uses
+Go duration syntax, such as `30m`, `1h30m`, or `"0"` (quote YAML zero to keep it
+a string). Zero selects full refresh; negative/invalid durations are rejected.
+The default state base is `$XDG_STATE_HOME/pocketpull`, or
+`$HOME/.local/state/pocketpull` when the XDG base is unset/empty.
+
+Read exactly one nonempty secret source: `POCKETPULL_API_KEY` **or** the selected
+`api_key_file`/`--api-key-file`. Both sources conflict even if equal, empty, or
+whitespace-only; an explicitly empty environment key or unusable file never
+falls back to another source. Leading/trailing whitespace is trimmed; embedded
+newlines are rejected. Secret files must be regular, usable, owned by the
+effective user, and have no group/other read permission. Provision the secret
+through your secret workflow and use `chmod 600 /path/to/api-key`; the collector
+does not change permissions. Do not place a literal `api_key` in YAML.
+
+No `.env` file is automatically loaded. A shell or development tool may
+explicitly export the environment key, but keep `.env` gitignored. Keep all
+secrets out of command arguments, tracked files, images and build arguments.
+Configuration/parser/file errors report only redacted operational categories,
+not supplied values or paths.
+
+**Current limitation:** T2 parses, validates and carries `refresh_after` and
+`state_dir`; T3 enables their operational use and canonical-raw-folder state
+namespacing. This version does not create state/cache/locks and still refetches
+every recording on every run. Supplying these flags does not enable caching.
+
+### Raw artifacts and current resilience
 
 Each snapshot is `<raw-dir>/<recording-id>/recording.json`: the **entire detail
 `data` object**, not its envelope. Unknown fields and exact large JSON integers
@@ -50,43 +106,66 @@ temporary file and atomic rename. Equivalent JSON (including reordered keys,
 whitespace and numeric spelling) is not rewritten. Invalid/failed responses
 and unsuccessful writes retain prior snapshots; remote absence/404 never
 removes them. Valid missing/null transcript data is pending, not an error.
-T1 refetches every listed ID on **every run**, including pending recordings.
+T2 refetches every listed ID on **every run**, including pending recordings.
 There is no state/cache or 24-hour refresh policy yet: an upstream edit is
 visible after the next successful fetch, normally within the cron interval
 plus run time. There are no retries or overlap lock yet; run serially.
 Requests have a 30-second timeout and a 32 MiB response limit; oversized
 responses fail without replacing prior data. HTTP redirects are not followed.
 
-JSON `slog` operational logs go to stderr; collection stdout remains empty.
+### Logs and exit status
+
+Go `slog` operational logs go to stderr; collection/error stdout remains empty.
+`log_format`/`--log-format` accepts `json` (default) or `text`.
+`log_level`/`--log-level` accepts `info` (default), `debug`, `warn`, or `error`:
+`info` includes start, fetched-record and summary events; `debug` additionally
+includes page-request events without request contents; `warn` suppresses
+info/debug; `error` shows errors only. Successful summaries are info-level,
+incomplete-run summaries are error-level. Invalid configuration always uses a
+safe JSON/error baseline, even if it attempted to select another format/level.
 Events include a run ID, recording ID where safe, and a final summary with
 `elapsed_ms`. `discovered` counts unique safe IDs visited, `fetched` counts
 successfully validated and stored/unchanged details, `unchanged` is a subset
 of `fetched`, and `pending` counts fetched records with missing/null transcript.
 `failed` counts failed listing/detail/storage work or rejected IDs; `cached`
-and `retries` are zero in T1. Logs exclude titles, transcript/summary content,
+and `retries` are zero in T2. Logs exclude titles, transcript/summary content,
 HTTP bodies, headers, keys, URLs and raw transport/filesystem errors.
 Individual detail failures retain partial progress and exit nonzero; 401/403
 stop promptly. Exit zero includes valid pending records, not necessarily
-finished upstream transcripts. Text/severity selection and comprehensive
-interruption/retry handling remain later slices.
+finished upstream transcripts. Comprehensive interruption/retry handling and
+complete resilience/count evidence remain T4 work.
 
-For cron, install the binary at a stable absolute path yourself. Until T2 adds
-the recommended owner-only API-key-file option, a provisioned owner-only
-`/home/collector/.config/pocketpull/cron-env` shell file may **explicitly export**
-`POCKETPULL_API_KEY`. It is a secret supplied by your secret workflow, not a
-repository file or automatically loaded configuration. Example crontab (hourly,
-with external nonwaiting `flock` while the native overlap lock is not yet built):
+### Cron
+
+Install the binary at a stable absolute path yourself. The secret-file option
+is recommended for cron, whose environment/working directory may differ from
+your shell. From this checkout, prepare the configuration:
+
+```sh
+install -d -m 700 "$HOME/.config/pocketpull"
+cp examples/pocketpull.yaml "$HOME/.config/pocketpull/config.yaml"
+# Provision $HOME/.config/pocketpull/api-key through your secret workflow first.
+chmod 600 "$HOME/.config/pocketpull/api-key"
+unset POCKETPULL_API_KEY
+/usr/local/bin/pocketpull --config "$HOME/.config/pocketpull/config.yaml"
+```
+
+Example crontab for a user whose home is `/home/collector` (hourly, with
+external nonwaiting `flock` until T3 provides the native overlap lock):
 
 ```cron
-15 * * * * /usr/bin/flock -n /home/collector/.config/pocketpull/cron.lock /bin/sh -c '. /home/collector/.config/pocketpull/cron-env && exec /usr/local/bin/pocketpull --raw-dir /home/collector/pocket-raw' 2>>/home/collector/pocketpull.log
+15 * * * * /usr/bin/flock -n /home/collector/.config/pocketpull/cron.lock /usr/local/bin/pocketpull --config /home/collector/.config/pocketpull/config.yaml 2>>/home/collector/pocketpull.log
 ```
 
 Create the parent directories and provision the secret before enabling this
 example; do not share that lock across unrelated raw directories. Cron and
 external tooling own scheduling and log rotation. There is no application log
-manager or telemetry exporter. Strict YAML configuration/secret files (T2),
-private freshness state/native locking and thousand-record evidence (T3),
-and bounded retries/fault handling/final logging coverage (T4) are not claimed.
+manager or telemetry exporter. With the intended T3 refresh policy, edits may
+take up to `refresh_after` plus the cron interval and run time to appear; T2
+currently fetches them on the next successful run. No guarantee applies to
+content that disappears before a successful fetch. Private freshness
+state/native locking and thousand-record evidence (T3), and bounded
+retries/fault handling/final logging coverage (T4), are not yet claimed.
 
 ```sh
 just collector-check
@@ -97,7 +176,8 @@ These use synthetic loopback HTTP fixtures and temporary output only.
 `collector-check` rejects unformatted Go (it does not silently format), runs
 vet/race tests, and builds CGO-free Linux amd64 and arm64 binaries with no
 installed application runtime requirement. `collector-smoke` runs a native
-subprocess through the real CLI entry using an internal, test-only fixture seam;
+subprocess through the real CLI entry using an internal, test-only fixture seam,
+covering environment/flags and config-file/secret-file with CLI overrides;
 neither command contacts Pocket or needs real credentials.
 
 ## Development workspace

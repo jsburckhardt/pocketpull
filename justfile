@@ -32,6 +32,6 @@ collector-check:
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$build_dir/pocketpull-amd64" ./cmd/pocketpull
     CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o "$build_dir/pocketpull-arm64" ./cmd/pocketpull
 
-# Collector: native subprocess, one-recording loopback HTTP fixture, no real key.
+# Collector: native subprocess, flags/config/secret-file loopback paths, no real key.
 collector-smoke:
     go test ./internal/cli -run '^TestNativeSmoke$' -count=1

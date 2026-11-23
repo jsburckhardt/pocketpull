@@ -1,0 +1,9 @@
+# Copy to $HOME/.config/pocketpull/config.yaml; paths are relative to that file.
+# Provision api-key separately, owned by the collecting user with mode 0600.
+raw_dir: ../../pocket-raw
+api_key_file: api-key
+state_dir: ../../.local/state/pocketpull
+# T2 validates/carries these settings; T3 enables freshness/state behavior.
+refresh_after: 24h
+log_format: json
+log_level: info

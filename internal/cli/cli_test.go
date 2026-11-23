@@ -27,7 +27,7 @@ func TestCLIProcess(t *testing.T) {
 	if os.Getenv("POCKETPULL_TEST_PROCESS") != "1" {
 		return
 	}
-	os.Exit(run(context.Background(), os.Args[stringsIndex(os.Args, "--")+1:], os.Getenv, os.Stdout, os.Stderr, dependencies{
+	os.Exit(run(context.Background(), os.Args[stringsIndex(os.Args, "--")+1:], os.LookupEnv, os.Stdout, os.Stderr, dependencies{
 		baseURL: os.Getenv("POCKETPULL_TEST_ENDPOINT"),
 		client:  &http.Client{Timeout: 5 * time.Second},
 	}))
@@ -66,39 +66,57 @@ func TestNativeSmoke(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	raw := t.TempDir()
-	command := exec.CommandContext(testContext(t), os.Args[0], "-test.run=^TestCLIProcess$", "--", "--raw-dir", raw)
-	command.Env = append(cleanEnvironment(), "POCKETPULL_TEST_PROCESS=1", "POCKETPULL_TEST_ENDPOINT="+server.URL, "POCKETPULL_API_KEY="+fixtureKey)
-	var stdout, stderr bytes.Buffer
-	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("native collection failed: %v; stderr=%s", err, &stderr)
-	}
-	if stdout.Len() != 0 {
-		t.Fatalf("collection wrote stdout: %q", &stdout)
-	}
-	got, err := os.ReadFile(filepath.Join(raw, "recording-1", "recording.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(decodeJSON(t, got), decodeJSON(t, []byte(fixtureDetail))) {
-		t.Fatalf("snapshot lost detail fields: %s", got)
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	if want := []string{"GET /public/recordings?page=1&limit=100", "GET /public/recordings/recording-1"}; !reflect.DeepEqual(requests, want) {
-		t.Fatalf("requests=%v; want=%v", requests, want)
-	}
-	assertRedacted(t, stderr.String())
-	var summary map[string]any
-	for _, line := range strings.Split(strings.TrimSpace(stderr.String()), "\n") {
-		event := decodeJSON(t, []byte(line)).(map[string]any)
-		if event["event"] == "summary" {
-			summary = event
-		}
-	}
-	if summary["fetched"] != json.Number("1") || summary["failed"] != json.Number("0") || summary["run_id"] == "" {
-		t.Fatalf("missing successful structured summary: %s", &stderr)
+	for _, mode := range []string{"environment flags", "config secret overrides"} {
+		t.Run(mode, func(t *testing.T) {
+			mu.Lock()
+			requests = nil
+			mu.Unlock()
+			raw := t.TempDir()
+			dir := t.TempDir()
+			args := []string{"--raw-dir", raw}
+			env := append(cleanEnvironment(), "HOME="+dir, "POCKETPULL_TEST_PROCESS=1", "POCKETPULL_TEST_ENDPOINT="+server.URL)
+			if mode == "config secret overrides" {
+				writeFixtureFile(t, filepath.Join(dir, "settings", "key"), fixtureKey+"\n", 0o600)
+				writeFixtureFile(t, filepath.Join(dir, "settings", "config.yaml"), "raw_dir: unused\napi_key_file: key\nlog_format: text\nlog_level: error\n", 0o600)
+				args = append([]string{"--config", "settings/config.yaml", "--log-format", "json", "--log-level", "debug", "--refresh-after", "0"}, args...)
+			} else {
+				env = append(env, "POCKETPULL_API_KEY="+fixtureKey)
+			}
+			command := exec.CommandContext(testContext(t), os.Args[0], append([]string{"-test.run=^TestCLIProcess$", "--"}, args...)...)
+			command.Dir = dir
+			command.Env = env
+			var stdout, stderr bytes.Buffer
+			command.Stdout, command.Stderr = &stdout, &stderr
+			if err := command.Run(); err != nil {
+				t.Fatalf("native collection failed: %v; stderr=%s", err, &stderr)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("collection wrote stdout: %q", &stdout)
+			}
+			got, err := os.ReadFile(filepath.Join(raw, "recording-1", "recording.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(decodeJSON(t, got), decodeJSON(t, []byte(fixtureDetail))) {
+				t.Fatalf("snapshot lost detail fields: %s", got)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if want := []string{"GET /public/recordings?page=1&limit=100", "GET /public/recordings/recording-1"}; !reflect.DeepEqual(requests, want) {
+				t.Fatalf("requests=%v; want=%v", requests, want)
+			}
+			assertRedacted(t, stderr.String())
+			var summary map[string]any
+			for _, line := range strings.Split(strings.TrimSpace(stderr.String()), "\n") {
+				event := decodeJSON(t, []byte(line)).(map[string]any)
+				if event["event"] == "summary" {
+					summary = event
+				}
+			}
+			if summary["fetched"] != json.Number("1") || summary["failed"] != json.Number("0") || summary["run_id"] == "" {
+				t.Fatalf("missing successful structured summary: %s", &stderr)
+			}
+		})
 	}
 }
 
@@ -112,7 +130,8 @@ func testContext(t *testing.T) context.Context {
 func cleanEnvironment() []string {
 	var result []string
 	for _, value := range os.Environ() {
-		if !strings.HasPrefix(value, "POCKETPULL_") {
+		if !strings.HasPrefix(value, "POCKETPULL_") && !strings.HasPrefix(value, "HOME=") &&
+			!strings.HasPrefix(value, "XDG_CONFIG_HOME=") && !strings.HasPrefix(value, "XDG_STATE_HOME=") {
 			result = append(result, value)
 		}
 	}
@@ -142,11 +161,11 @@ func assertRedacted(t *testing.T, logs string) {
 func invoke(t *testing.T, endpoint, raw string, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := run(testContext(t), append([]string{"--raw-dir", raw}, args...), func(name string) string {
+	code := run(testContext(t), append([]string{"--raw-dir", raw, "--state-dir", t.TempDir()}, args...), func(name string) (string, bool) {
 		if name == "POCKETPULL_API_KEY" {
-			return fixtureKey
+			return fixtureKey, true
 		}
-		return ""
+		return "", false
 	}, &stdout, &stderr, dependencies{baseURL: endpoint, client: &http.Client{Timeout: 5 * time.Second}})
 	if stdout.Len() != 0 {
 		t.Errorf("collection wrote stdout: %q", &stdout)
@@ -456,7 +475,7 @@ func TestHelpVersionAndInvalidConfiguration(t *testing.T) {
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			code := run(testContext(t), args, func(string) string { return "" }, &stdout, &stderr, dependencies{})
+			code := run(testContext(t), args, func(string) (string, bool) { return "", false }, &stdout, &stderr, dependencies{})
 			informational := len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "--version")
 			if informational {
 				if code != 0 || stdout.Len() == 0 || stderr.Len() != 0 {
@@ -478,8 +497,8 @@ func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
 
 func TestTransportErrorsAreRedacted(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := run(testContext(t), []string{"--raw-dir", t.TempDir()}, func(string) string {
-		return fixtureKey
+	code := run(testContext(t), []string{"--raw-dir", t.TempDir(), "--state-dir", t.TempDir()}, func(name string) (string, bool) {
+		return fixtureKey, name == "POCKETPULL_API_KEY"
 	}, &stdout, &stderr, dependencies{
 		baseURL: "http://fixture", client: &http.Client{Transport: failingTransport{}},
 	})

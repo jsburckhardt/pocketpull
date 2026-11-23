@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"crypto/rand"
-	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -18,17 +17,28 @@ const productionEndpoint = "https://public.heypocketai.com/api/v1"
 
 var version = "dev"
 
-const usage = `Usage: pocketpull --raw-dir DIRECTORY
+const usage = `Usage: pocketpull [OPTIONS]
 
 Collect once from Pocket into DIRECTORY/<recording-id>/recording.json.
-Requires POCKETPULL_API_KEY in the environment; no .env file is loaded.
+Requires POCKETPULL_API_KEY OR an owner-only API key file; no .env is loaded.
 
 Options:
-  --raw-dir DIRECTORY  Required raw snapshot directory
-  --help               Show help without collecting
-  --version            Show version without collecting
+  --config FILE          Select one strict YAML configuration
+  --raw-dir DIRECTORY    Required raw snapshot directory (or raw_dir in YAML)
+  --api-key-file FILE     User-owned secret file with no group/other read access
+  --state-dir DIRECTORY  State base (parsed only; operational use deferred)
+  --refresh-after TIME   Nonnegative Go duration, default 24h; 0 = full refresh
+                         Parsed only; this version still refetches every run
+  --log-format FORMAT    json (default) or text, on stderr
+  --log-level LEVEL      info (default), debug, warn or error
+  --help                 Show help without reading config/secrets or collecting
+  --version              Show version without reading config/secrets or collecting
 
-Logs are JSON on stderr; collection leaves stdout free.
+Discovery: ./pocketpull.yaml, then XDG_CONFIG_HOME/pocketpull/config.yaml
+(or HOME/.config/pocketpull/config.yaml). No merging; explicit flags win.
+YAML paths are file-relative; CLI paths are working-directory-relative.
+Default state base: XDG_STATE_HOME/pocketpull or HOME/.local/state/pocketpull.
+Collection runs once and leaves stdout free; cron owns scheduling.
 `
 
 type dependencies struct {
@@ -37,52 +47,43 @@ type dependencies struct {
 }
 
 // Run executes one collection. Its returned code is suitable for os.Exit.
-func Run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer) int {
-	return run(ctx, args, getenv, stdout, stderr, dependencies{
+func Run(ctx context.Context, args []string, lookup func(string) (string, bool), stdout, stderr io.Writer) int {
+	return run(ctx, args, lookup, stdout, stderr, dependencies{
 		baseURL: productionEndpoint,
 		client:  &http.Client{Timeout: 30 * time.Second},
 	})
 }
 
-func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer, deps dependencies) int {
-	key := strings.TrimSpace(getenv("POCKETPULL_API_KEY"))
-	log := slog.New(slog.NewJSONHandler(stderr, &slog.HandlerOptions{
+func run(ctx context.Context, args []string, lookup environment, stdout, stderr io.Writer, deps dependencies) int {
+	config, information, err := configure(args, lookup)
+	if information != "" {
+		fmt.Fprint(stdout, information)
+		return 0
+	}
+	if err != nil {
+		slog.New(slog.NewJSONHandler(stderr, nil)).Error("invalid configuration",
+			"event", "configuration_failed", "reason", err.Error())
+		return 1
+	}
+	options := &slog.HandlerOptions{
+		Level: config.logLevel,
 		ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
-			if key != "" && attr.Value.Kind() == slog.KindString {
-				attr.Value = slog.StringValue(strings.ReplaceAll(attr.Value.String(), key, "[redacted]"))
+			if attr.Value.Kind() == slog.KindString {
+				attr.Value = slog.StringValue(strings.ReplaceAll(attr.Value.String(), config.apiKey, "[redacted]"))
 			}
 			return attr
 		},
-	})).With("run_id", rand.Text())
-	flags := flag.NewFlagSet("pocketpull", flag.ContinueOnError)
-	flags.SetOutput(io.Discard)
-	rawDir := flags.String("raw-dir", "", "")
-	help := flags.Bool("help", false, "")
-	showVersion := flags.Bool("version", false, "")
-	if err := flags.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			fmt.Fprint(stdout, usage)
-			return 0
-		}
-		log.Error("invalid arguments", "event", "configuration_failed")
-		return 1
 	}
-	if *help {
-		fmt.Fprint(stdout, usage)
-		return 0
+	var handler slog.Handler = slog.NewJSONHandler(stderr, options)
+	if config.logFormat == "text" {
+		handler = slog.NewTextHandler(stderr, options)
 	}
-	if *showVersion {
-		fmt.Fprintln(stdout, "pocketpull "+version)
-		return 0
-	}
-	if flags.NArg() != 0 || strings.TrimSpace(*rawDir) == "" || key == "" || strings.ContainsAny(key, "\r\n") {
-		log.Error("raw directory and valid environment credential required", "event", "configuration_failed")
-		return 1
-	}
+	log := slog.New(handler).With("run_id", rand.Text())
 	start := time.Now()
 	log.Info("collection started", "event", "run_started")
 	summary, err := collector.Run(ctx, collector.Options{
-		RawDir: *rawDir, APIKey: key, BaseURL: deps.baseURL, Client: deps.client, Log: log,
+		RawDir: config.rawDir, APIKey: config.apiKey, StateDir: config.stateDir, RefreshAfter: config.refreshAfter,
+		BaseURL: deps.baseURL, Client: deps.client, Log: log,
 	})
 	level := slog.LevelInfo
 	if err != nil {
