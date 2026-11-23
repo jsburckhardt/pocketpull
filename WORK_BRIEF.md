@@ -100,8 +100,8 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, go.mod, go.sum, justfile, AGENTS.md, README.md owned by T1 until integration, then transferred serially to its dependant
 - Resources: Loopback HTTP fixture on an OS-assigned port; temporary raw/test/build directories only
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: ready
-- Worker: None
+- Status: in-progress
+- Worker: factory/collector-t1; base 08773f6427fc2a5ace2d5b70888ed23f74193a96; head pending; PID 887 in devcontainer 43753475d620; log .trees/collector-t1.log
 
 ### T2 Config-driven and cron-safe collection with strict secret handling
 - ACs: AC2, AC6, AC9; AC1, AC4, AC5 regression
