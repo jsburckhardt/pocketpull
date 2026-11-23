@@ -133,8 +133,8 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T4; Lead owns final evidence/publication in this brief and PR
 - Resources: Fault-injected loopback HTTP fixtures on OS-assigned ports; temporary state/raw/build directories and identified subprocesses only
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: ready
-- Worker: None
+- Status: in-progress
+- Worker: factory/collector-t4; base 31fea616b683b02a24e5f473fffb4d04aa4af78f; head pending; PID 36732 in devcontainer 43753475d620; log .trees/collector-t4.log
 
 ## Status
 delivering
