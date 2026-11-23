@@ -63,9 +63,29 @@ Tracking issue: [#2](https://github.com/jsburckhardt/pocketpull/issues/2). This 
 None. No spike is authorised. If a pinned Copilot build cannot satisfy actual metadata-only OTLP emission, or an authenticated integration check cannot run, report the exact blocker rather than weakening AC8.
 
 ## Tasks
-None. factory-slice will record the approved vertical tasks before dispatch.
+### T1 A usable development workspace with signed commits
+- ACs: AC7, AC9
+- Depends on: None
+- Contracts: Development workspace, relevant delivery shape, and authentication/signing documentation; telemetry must remain unconfigured and development must work without it.
+- Write scope: .devcontainer/**, justfile, .gitignore, README.md, AGENTS.md; do not modify briefs, factory skills, collector files, or repository Git configuration.
+- Shared files: .devcontainer/**, justfile, .gitignore, README.md, AGENTS.md are owned by T1 until integration; T2 may change them only after T1 integrates.
+- Resources: One task-specific devcontainer and disposable local signing-test directory; no production keys copied or services left running.
+- Checks: just dev-check; devcontainer build --workspace-folder .; devcontainer up --workspace-folder .; devcontainer exec --workspace-folder . just dev-smoke. Document and run a disposable-key check that proves SSH signing through a read-only host-directory mount, plus non-root/tool/mount/no-auto-start checks. Planned recipes must exercise actual behaviour, not placeholders.
+- Status: ready
+- Worker: None
+
+### T2 Observable Copilot sessions without content capture
+- ACs: AC8, AC9
+- Depends on: T1
+- Contracts: Copilot observability and external-collector documentation; preserve the accepted workspace and SSH-signing behaviour from T1.
+- Write scope: .devcontainer/**, justfile, .gitignore, README.md, AGENTS.md; do not modify briefs, factory skills, collector files, or repository Git configuration.
+- Shared files: T2 owns changes to .devcontainer/**, justfile, .gitignore, README.md, AGENTS.md after T1 integrates; no concurrent writer.
+- Resources: One task-specific devcontainer and ephemeral loopback test collector on a dynamically assigned port; only synthetic prompts/test credentials, no private-content export, no detached services after checks.
+- Checks: just dev-check; devcontainer build --workspace-folder .; devcontainer up --workspace-folder .; devcontainer exec --workspace-folder . just dev-smoke; devcontainer exec --workspace-folder . just dev-telemetry-smoke. Prove actual pinned Copilot trace/metric emission to the test collector with supplied headers and no content capture, and prove the unconfigured path remains usable. Escalate missing authentication or unsupported exporter behaviour instead of mocking actual CLI emission.
+- Status: blocked
+- Worker: None
 
 ## Status
 go
 
-Owner approved #2 delivery via factory-slice followed by factory-deliver as Lead. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
+Owner approved #2 delivery via factory-slice followed by factory-deliver as Lead. Sequential T1/T2 slices cover every AC; T2 waits for reviewed and integrated T1. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
