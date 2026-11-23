@@ -51,8 +51,8 @@ Tracking issue: [#1](https://github.com/jsburckhardt/pocketpull/issues/1). This 
 - Collection leaves stdout free. No application log-file management, rotation service, or telemetry exporter is included.
 
 ## Constraints
-- Collector delivery remains alignment-only: no collector implementation or application dependency installation is authorised. Separate development-environment delivery is authorised only under #2.
-- The owner authorised committing AGENTS.md and both root briefs to main and pushing them. This replaces the earlier local-only record restriction, not the collector delivery gate.
+- The owner authorised resuming #1 with factory-slice followed by factory-deliver as Lead on 2026-11-23. The first slice must collect one recording end-to-end into the raw folder against an HTTP fixture. This supersedes the earlier collector delivery gate; implementation and necessary application dependencies within this agreement are authorised.
+- Deliver #1 on one integration branch and one independently accepted PR. The owner retains merge and release authority. Development-environment scope remains exclusively in the merged #2 delivery.
 - Use Go and prefer the simplest implementation satisfying these contracts. Cobra is a suitable delegated CLI choice; avoid Viper's implicit discovery/merging in favour of explicit strict YAML parsing. Exact supported pinned tool versions, package structure, minimal dependencies, request pacing/retries/timeouts, and detailed event formatting are delegated within the agreed boundaries.
 - Consequential changes to data completeness, credential handling, public contracts, dependency/cost/privacy boundaries, or scope require renewed alignment. No private inputs are sent to external research services.
 - Decisive delivery evidence may use fixtures derived from public documentation. No authenticated Pocket experiment is required or authorised here. An incompatible live API discovery reopens alignment instead of silently changing behaviour.
@@ -84,14 +84,59 @@ Tracking issue: [#1](https://github.com/jsburckhardt/pocketpull/issues/1). This 
 | D17 | Publish AGENTS.md, WORK_BRIEF.md for #1, and WORK_BRIEF_DEV_ENV.md for #2 to main with a signed commit and push. | Explicit owner instruction replaces the earlier local-only/uncommitted restriction; one brief per issue. | owner |
 | D18 | Keep collector #1 alignment-only; grant delivery go for #2 only. | The owner explicitly limited the superseding delivery authority to the development environment. | owner |
 | D19 | Move AC7, AC8, development contracts, and the development-auth/signing/telemetry portion of AC9 to #2. | Separate a useful development delivery from unapproved collector implementation; retain original AC IDs for traceability. | owner |
+| D22 | Resume collector #1; use factory-slice then factory-deliver as Lead, starting with one recording end-to-end into raw storage against an HTTP fixture. | Explicit owner go on 2026-11-23 supersedes D18 for #1; #2 remains separately delivered and merged. | owner |
 
 ## Open questions and spikes
 None. No spike is approved or required for the conservative agreed collection strategy. A live API incompatibility or another consequential collector contract change must reopen alignment.
 
 ## Tasks
-None. Owned by factory-slice after explicit delivery authorisation; this alignment does not create implementation tasks.
+Tasks are sequential because they extend the same CLI/collection contracts and shared files. Partial AC mappings below identify incremental evidence, not acceptance of the complete AC before its final owning task integrates. The Lead owns this brief and review records; implementers must not edit either brief or development-environment files.
+
+### T1 One recording reaches raw storage through a native CLI HTTP-fixture run
+- ACs: AC1, AC3, AC4, AC5, AC6, AC9 (thin-path evidence; remaining coverage in T2-T4)
+- Depends on: None
+- Contracts: Native run-once CLI; --help/--version; required --raw-dir and environment-only credential for this slice; documented Bearer list/detail routes; page traversal and ID deduplication; complete detail data preserving unknown fields; stable safe ID paths; atomic changed-only snapshots; no audio/pruning; baseline redacted slog stderr and summary. HTTP endpoint injection is internal/test-only, not an added public flag or environment contract.
+- Write scope: go.mod, go.sum, cmd/**, internal/**, justfile, AGENTS.md, README.md, .gitignore
+- Shared files: cmd/**, internal/**, go.mod, go.sum, justfile, AGENTS.md, README.md owned by T1 until integration, then transferred serially to its dependant
+- Resources: Loopback HTTP fixture on an OS-assigned port; temporary raw/test/build directories only
+- Checks: just collector-check; just collector-smoke; just dev-check
+- Status: ready
+- Worker: None
+
+### T2 Config-driven and cron-safe collection with strict secret handling
+- ACs: AC2, AC6, AC9; AC1, AC4, AC5 regression
+- Depends on: T1
+- Contracts: Complete invocation/configuration/authentication contracts; single strict YAML file, exact discovery and CLI precedence, relative paths, no .env loading, owner-only secret files and conflicts; all collection flags; logging formats/severities and redaction even on malformed configuration; executable usage/cron/configuration examples. Preserve T1's fixture-to-raw path.
+- Write scope: go.mod, go.sum, cmd/**, internal/**, justfile, AGENTS.md, README.md, examples/**, .gitignore
+- Shared files: cmd/**, internal/**, go.mod, go.sum, justfile, AGENTS.md, README.md owned by T2 until integration, then transferred serially to its dependant
+- Resources: Loopback HTTP fixture on an OS-assigned port; temporary config/secret/raw directories only
+- Checks: just collector-check; just collector-smoke; just dev-check
+- Status: blocked
+- Worker: None
+
+### T3 Thousand-record repeated collections refresh safely without overlap
+- ACs: AC3, AC4, AC5, AC9; AC2, AC6 regression
+- Depends on: T2
+- Contracts: Full 1,000-record multipage traversal and deduplication; new records immediate, existing/pending records refreshed by successful fetch time with injected clock; zero refresh; missing/unusable state or output refetch; canonical-raw-path state namespace outside raw; nonwaiting process-recoverable overlap lock; changed-only snapshots, missing/404 records never prune; document artifact layout and refresh latency.
+- Write scope: cmd/**, internal/**, justfile, AGENTS.md, README.md, examples/**
+- Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T3 until integration, then transferred serially to its dependant
+- Resources: Loopback HTTP fixtures on OS-assigned ports; independent temporary state/raw directories and subprocesses; no production archive
+- Checks: just collector-check; just collector-smoke; just dev-check
+- Status: blocked
+- Worker: None
+
+### T4 Interrupted and failing runs retain progress and report a complete operational outcome
+- ACs: AC1, AC2, AC3, AC4, AC5, AC6, AC9 (complete final coverage)
+- Depends on: T3
+- Contracts: Bounded transient network/429/server retries and timeouts; prompt auth stop; individual failures preserve partial progress and exit nonzero; malformed/failed-write cases preserve snapshots and never advance freshness; interruption/restart safety; pending is not an error; complete run/event/count logging, redacted at every severity, stdout free; final documentation covers all collector contracts and native amd64/arm64 builds.
+- Write scope: cmd/**, internal/**, justfile, AGENTS.md, README.md, examples/**
+- Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T4; Lead owns final evidence/publication in this brief and PR
+- Resources: Fault-injected loopback HTTP fixtures on OS-assigned ports; temporary state/raw/build directories and identified subprocesses only
+- Checks: just collector-check; just collector-smoke; just dev-check
+- Status: blocked
+- Worker: None
 
 ## Status
-aligning
+delivering
 
-Shared understanding and collector AC1-AC6/AC9 are approved. Collector delivery is NOT authorised. The owner authorised publishing this agreement to main; only #2 has delivery go.
+Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and development AC9 remain exclusively in #2, merged by #3 at 548d269e38b3f332c8d4bbf2b4fc3870f8362630. Lead session: c5fac65e-0ea9-4288-aa93-7440ab7136d6. Integration branch: delivery/1-collector. Start with T1; unlock each dependant only after independent task acceptance, serial integration and combined checks. One final accepted PR targets main; the owner merges/releases.
