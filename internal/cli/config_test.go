@@ -44,8 +44,8 @@ func TestConfigSecretFileCollection(t *testing.T) {
 	if _, err := os.ReadFile(filepath.Join(dir, "raw", "recording-1", "recording.json")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "state")); !os.IsNotExist(err) {
-		t.Fatalf("T2 unexpectedly created operational state: %v", err)
+	if entries, err := os.ReadDir(filepath.Join(dir, "state")); err != nil || len(entries) != 1 {
+		t.Fatalf("configured state namespace missing: %v, %v", entries, err)
 	}
 	assertRedacted(t, stderr.String())
 }

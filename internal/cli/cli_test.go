@@ -29,7 +29,7 @@ func TestCLIProcess(t *testing.T) {
 	}
 	os.Exit(run(context.Background(), os.Args[stringsIndex(os.Args, "--")+1:], os.LookupEnv, os.Stdout, os.Stderr, dependencies{
 		baseURL: os.Getenv("POCKETPULL_TEST_ENDPOINT"),
-		client:  &http.Client{Timeout: 5 * time.Second},
+		client:  &http.Client{Timeout: 30 * time.Second},
 	}))
 }
 
@@ -73,7 +73,7 @@ func TestNativeSmoke(t *testing.T) {
 			mu.Unlock()
 			raw := t.TempDir()
 			dir := t.TempDir()
-			args := []string{"--raw-dir", raw}
+			args := []string{"--raw-dir", raw, "--state-dir", filepath.Join(dir, "state")}
 			env := append(cleanEnvironment(), "HOME="+dir, "POCKETPULL_TEST_PROCESS=1", "POCKETPULL_TEST_ENDPOINT="+server.URL)
 			if mode == "config secret overrides" {
 				writeFixtureFile(t, filepath.Join(dir, "settings", "key"), fixtureKey+"\n", 0o600)

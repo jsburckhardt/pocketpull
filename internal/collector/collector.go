@@ -9,27 +9,27 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"time"
 )
 
 type Options struct {
-	RawDir  string
-	APIKey  string
-	BaseURL string
-	Client  *http.Client
-	Log     *slog.Logger
-	// StateDir and RefreshAfter are validated by the CLI; T3 enables their use.
+	RawDir       string
+	APIKey       string
+	BaseURL      string
+	Client       *http.Client
+	Log          *slog.Logger
 	StateDir     string
 	RefreshAfter time.Duration
+	Now          func() time.Time
 }
 
 type Summary struct {
 	Discovered int
 	Fetched    int
 	Unchanged  int
+	Cached     int
 	Pending    int
 	Failed     int
 }
@@ -45,16 +45,15 @@ var (
 // describe operational categories only, never HTTP bodies, URLs or OS paths.
 func Run(ctx context.Context, options Options) (Summary, error) {
 	var summary Summary
-	if err := os.MkdirAll(options.RawDir, 0o700); err != nil {
-		summary.Failed++
-		return summary, errors.New("raw directory unavailable")
+	if options.Now == nil {
+		options.Now = time.Now
 	}
-	root, err := os.OpenRoot(options.RawDir)
+	store, err := coordinate(options)
 	if err != nil {
 		summary.Failed++
-		return summary, errors.New("raw directory unavailable")
+		return summary, err
 	}
-	defer root.Close()
+	defer store.close()
 	client := *options.Client
 	client.CheckRedirect = func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -98,10 +97,16 @@ func Run(ctx context.Context, options Options) (Summary, error) {
 			if ctx.Err() != nil {
 				return summary, errInterrupted
 			}
+			if store.fresh(record.ID, options.Now(), options.RefreshAfter) {
+				summary.Cached++
+				options.Log.Debug("recording cached", "event", "recording_cached", "recording_id", record.ID)
+				continue
+			}
 			data, pending, err := detail(ctx, options, record.ID)
 			if err == nil {
+				completed := options.Now()
 				var changed bool
-				changed, err = snapshot(ctx, root, record.ID, data)
+				changed, err = snapshot(ctx, store.raw, record.ID, data)
 				if err == nil {
 					summary.Fetched++
 					if !changed {
@@ -111,7 +116,10 @@ func Run(ctx context.Context, options Options) (Summary, error) {
 						summary.Pending++
 					}
 					options.Log.Info("recording fetched", "event", "recording_fetched", "recording_id", record.ID, "changed", changed, "pending", pending)
-					continue
+					err = store.remember(ctx, record.ID, completed)
+					if err == nil {
+						continue
+					}
 				}
 			}
 			summary.Failed++
@@ -171,13 +179,23 @@ func detail(ctx context.Context, options Options, id string) (json.RawMessage, b
 		Success bool            `json:"success"`
 		Data    json.RawMessage `json:"data"`
 	}
-	var object map[string]json.RawMessage
-	var detailID string
-	if json.Unmarshal(body, &envelope) != nil || !envelope.Success ||
-		json.Unmarshal(envelope.Data, &object) != nil || object == nil ||
-		json.Unmarshal(object["id"], &detailID) != nil || detailID != id {
+	if json.Unmarshal(body, &envelope) != nil || !envelope.Success {
 		return nil, false, errors.New("invalid detail response")
 	}
+	pending, valid := validRecording(envelope.Data, id)
+	if !valid {
+		return nil, false, errors.New("invalid detail response")
+	}
+	return envelope.Data, pending, nil
+}
+
+func validRecording(data []byte, id string) (pending, valid bool) {
+	var object map[string]json.RawMessage
+	var detailID string
+	if json.Unmarshal(data, &object) != nil || object == nil ||
+		json.Unmarshal(object["id"], &detailID) != nil || detailID != id {
+		return false, false
+	}
 	transcript := bytes.TrimSpace(object["transcript"])
-	return envelope.Data, len(transcript) == 0 || bytes.Equal(transcript, []byte("null")), nil
+	return len(transcript) == 0 || bytes.Equal(transcript, []byte("null")), true
 }

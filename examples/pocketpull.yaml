@@ -3,7 +3,9 @@
 raw_dir: ../../pocket-raw
 api_key_file: api-key
 state_dir: ../../.local/state/pocketpull
-# T2 validates/carries these settings; T3 enables freshness/state behavior.
+# State must stay outside raw; canonical raw paths get separate private namespaces.
+# 24h is the default, including pending records. Use "0" or --refresh-after 0
+# for a full detail refresh; all listing pages are traversed in either mode.
 refresh_after: 24h
 log_format: json
 log_level: info

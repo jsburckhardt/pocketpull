@@ -26,9 +26,8 @@ Options:
   --config FILE          Select one strict YAML configuration
   --raw-dir DIRECTORY    Required raw snapshot directory (or raw_dir in YAML)
   --api-key-file FILE     User-owned secret file with no group/other read access
-  --state-dir DIRECTORY  State base (parsed only; operational use deferred)
+  --state-dir DIRECTORY  Private state base outside raw (canonical namespace)
   --refresh-after TIME   Nonnegative Go duration, default 24h; 0 = full refresh
-                         Parsed only; this version still refetches every run
   --log-format FORMAT    json (default) or text, on stderr
   --log-level LEVEL      info (default), debug, warn or error
   --help                 Show help without reading config/secrets or collecting
@@ -93,7 +92,7 @@ func run(ctx context.Context, args []string, lookup environment, stdout, stderr 
 	log.Log(ctx, level, "collection summary", "event", "summary",
 		"elapsed_ms", time.Since(start).Milliseconds(),
 		"discovered", summary.Discovered, "fetched", summary.Fetched,
-		"unchanged", summary.Unchanged, "cached", 0,
+		"unchanged", summary.Unchanged, "cached", summary.Cached,
 		"pending", summary.Pending, "failed", summary.Failed, "retries", 0)
 	if err != nil {
 		return 1

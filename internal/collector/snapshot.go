@@ -28,7 +28,7 @@ func snapshot(ctx context.Context, root *os.Root, id string, data json.RawMessag
 	}
 	defer directory.Close()
 	const name = "recording.json"
-	previous, err := directory.ReadFile(name)
+	previous, err := regularFile(directory, name, 32<<20, false)
 	if err == nil && sameJSON(previous, data) {
 		return false, nil
 	}
@@ -40,34 +40,41 @@ func snapshot(ctx context.Context, root *os.Root, id string, data json.RawMessag
 		return false, errors.New("invalid snapshot JSON")
 	}
 	formatted.WriteByte('\n')
+	if err := atomicReplace(ctx, directory, name, formatted.Bytes()); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func atomicReplace(ctx context.Context, directory *os.Root, name string, data []byte) (err error) {
 	tempName := ".recording-" + rand.Text() + ".tmp"
 	file, err := directory.OpenFile(tempName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return false, errors.New("snapshot temporary file unavailable")
+		return errors.New("snapshot temporary file unavailable")
 	}
 	defer func() {
 		if cleanupErr := directory.Remove(tempName); cleanupErr != nil && !errors.Is(cleanupErr, os.ErrNotExist) {
 			err = errors.Join(err, errors.New("snapshot temporary cleanup failed"))
 		}
 	}()
-	if _, err := io.Copy(file, &formatted); err != nil {
+	if _, err := io.Copy(file, bytes.NewReader(data)); err != nil {
 		file.Close()
-		return false, errors.New("snapshot write failed")
+		return errors.New("snapshot write failed")
 	}
 	if err := file.Sync(); err != nil {
 		file.Close()
-		return false, errors.New("snapshot sync failed")
+		return errors.New("snapshot sync failed")
 	}
 	if err := file.Close(); err != nil {
-		return false, errors.New("snapshot close failed")
+		return errors.New("snapshot close failed")
 	}
 	if ctx.Err() != nil {
-		return false, errInterrupted
+		return errInterrupted
 	}
 	if err := directory.Rename(tempName, name); err != nil {
-		return false, errors.New("snapshot replacement failed")
+		return errors.New("snapshot replacement failed")
 	}
-	return true, nil
+	return nil
 }
 
 func sameJSON(a, b []byte) bool {
