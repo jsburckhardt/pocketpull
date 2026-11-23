@@ -7,7 +7,7 @@ Tracking issue: [#2](https://github.com/jsburckhardt/pocketpull/issues/2). This 
 
 ## Acceptance criteria
 - AC7: The devcontainer builds and runs as non-root with Go, Git/GitHub CLI, Copilot CLI, pinned Herdr, just, and zsh; SSH commit signing works through the approved read-only SSH-directory mount. It has no host Docker socket or production-data mount, and does not auto-start Herdr. | evidence: devcontainer build/tool smoke checks, mount/user inspection, and signing verification with a disposable test key rather than production credentials.
-- AC8: Supplied host OTLP endpoint/optional headers let Copilot emit metadata-only OTLP/HTTP protobuf to a test collector; without telemetry configuration the workspace remains usable. | evidence: a clean-profile Copilot/test-collector smoke check of traces/metrics, protocol, and absence of content capture; unconfigured workspace smoke check. External Azure forwarding is not claimed by this check.
+- AC8: Supplied host OTLP endpoint/optional headers let Copilot emit metadata-only OTLP/HTTP protobuf to a test collector; without telemetry configuration the workspace remains usable. The SDK's automatic `enduser.pseudo.id` is the only permitted account-identity field; other identity/content capture remains prohibited. | evidence: a clean-profile Copilot/test-collector smoke check of traces/metrics, protocol, the narrow field exception, and absence of other identity/content capture; unconfigured workspace smoke check. External Azure forwarding is not claimed by this check.
 - AC9: Development usage documentation/examples cover development authentication, SSH commit signing, and external telemetry setup. | evidence: documentation review against these contracts and executable examples where applicable. Collector usage documentation remains in #1.
 
 ## Contracts
@@ -22,6 +22,7 @@ Tracking issue: [#2](https://github.com/jsburckhardt/pocketpull/issues/2). This 
 ### Copilot observability
 - Optional, development-only Copilot export uses host-supplied `OTEL_EXPORTER_OTLP_ENDPOINT` and optional `OTEL_EXPORTER_OTLP_HEADERS`, OTLP/HTTP with `http/protobuf`, and metadata-only capture.
 - Do not hard-code `host.docker.internal` or enable prompt/response, tool-argument/result, policy-detail, or identity capture in repository-owned configuration. Verification uses a clean profile; external user/organization telemetry policy is outside repository control.
+- Owner permits only the automatically exported `enduser.pseudo.id` as operational metadata. It may correlate sessions and is not assumed anonymous. Keep identity capture disabled; names, raw user IDs, OS/host identity, and other `enduser.*` fields remain prohibited. The gate must allow this exact key only, not the whole namespace.
 - An externally managed OTLP collector owns forwarding to Application Insights. An Application Insights connection string is not substituted for an OTLP URL. No collector sidecar, Azure provisioning, or connection-string bridge is included. Missing telemetry configuration must not block development.
 - Supply connection details through explicit host environment variables, never checked-in files or image layers. Never capture credentials, private prompts, source content, or production data in test telemetry.
 
@@ -44,7 +45,7 @@ Tracking issue: [#2](https://github.com/jsburckhardt/pocketpull/issues/2). This 
 ## Out of scope
 - Collector implementation and collector usage documentation, including cron, application config/secrets, refresh/cache behaviour, raw artifacts, and application logs; those remain in #1 without delivery go.
 - Host Docker integration, privileged mode, broad home mounts, production credentials/archive mounts, and hardened untrusted-agent sandboxing.
-- An in-repository telemetry bridge/sidecar, Azure provisioning, direct connection-string integration, content/identity capture, live Azure acceptance, or collector-application Application Insights instrumentation.
+- An in-repository telemetry bridge/sidecar, Azure provisioning, direct connection-string integration, content/identity capture beyond the exact permitted `enduser.pseudo.id` field, live Azure acceptance, or collector-application Application Insights instrumentation.
 - Automatic Herdr startup, release publication, PR merging, and changes to the repository default branch or deletion of master.
 
 ## Decisions
@@ -58,9 +59,10 @@ Tracking issue: [#2](https://github.com/jsburckhardt/pocketpull/issues/2). This 
 | D18 | Authorise #2 delivery only; keep collector #1 alignment-only. | Explicit owner go supersedes the previous no-go only for this issue. | owner |
 | D19 | Own AC7, AC8, and development-auth/signing/telemetry AC9 separately from collector #1. | A useful independent delivery with its own acceptance and PR. | owner |
 | D20 | Sequential workspace/signing and telemetry slices with fresh independent reviews. | Shared configuration/docs require one owner at a time; parallelism is not a goal. | delegated |
+| D21 | Permit only the SDK's automatic enduser.pseudo.id; keep every other identity/content gate unchanged and continue #2. | Independent review reproduced this account-correlating metadata despite disabled capture; the owner explicitly approved the exact exception rather than a broad relaxation or unverified CLI fix. | owner |
 
 ## Open questions and spikes
-Owner: decide whether the SDK's observed `enduser.pseudo.id` is permitted operational metadata or must remain prohibited identity data. Pinned Copilot 1.0.114 emitted it despite all capture settings being false; no external export or test-gate relaxation is approved. Independent confirmation is pending. No spike is authorised.
+None. Owner resolved the pseudonymous-field boundary in D21. No spike, CLI version change, or broader capture is authorised.
 
 ## Tasks
 ### T1 A usable development workspace with signed commits
@@ -82,12 +84,12 @@ Owner: decide whether the SDK's observed `enduser.pseudo.id` is permitted operat
 - Shared files: T2 owns changes to .devcontainer/**, justfile, .gitignore, README.md, AGENTS.md after T1 integrates; no concurrent writer.
 - Resources: One task-specific devcontainer and ephemeral loopback test collector on a dynamically assigned port; only synthetic prompts/test credentials, no private-content export, no detached services after checks.
 - Checks: just dev-check; devcontainer build --workspace-folder .; devcontainer up --workspace-folder .; devcontainer exec --workspace-folder . just dev-smoke; devcontainer exec --workspace-folder . just dev-telemetry-smoke. Prove actual pinned Copilot trace/metric emission to the test collector with supplied headers and no content capture, and prove the unconfigured path remains usable. Escalate missing authentication or unsupported exporter behaviour instead of mocking actual CLI emission.
-- Status: review
-- Worker: branch factory/dev-env-t2; base 353818b3a3e4c481f56402f09c1e819529074dfc; head e58c965598163ee932226466c623c74865c38b35; PID 3358244 exited with no surviving group processes; log .trees/dev-env-t2.log. Builder reports blocked AC8: real OTLP emitted enduser.pseudo.id despite disabled capture; independent review pending. Not integrated.
+- Status: ready
+- Worker: initial branch factory/dev-env-t2; base 353818b3a3e4c481f56402f09c1e819529074dfc; head e58c965598163ee932226466c623c74865c38b35; PID 3358244 exited with no surviving group processes; log .trees/dev-env-t2.log. Independent review blocked the original gate on design finding F1. D21 resolves F1; targeted correction must be reviewed before integration.
 
 ## Status
 delivering
 
-Owner approved #2 delivery via factory-slice followed by factory-deliver as Lead. T1 passed independent acceptance and integrated unchanged; combined configuration, just formatting, and disposable-key devcontainer signing/runtime checks passed on the integration branch. T2 is committed but not integrated: its privacy gate failed and independent acceptance is pending. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
+Owner approved #2 delivery via factory-slice followed by factory-deliver as Lead. T1 passed independent acceptance and integrated unchanged. Independent T2 review confirmed the original privacy gate failure; the owner then approved only enduser.pseudo.id in D21 and authorised continuation. T2 awaits a targeted correction and renewed independent acceptance before integration. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
 
 T1 evidence: builder and independent reviewer verified configuration checks, native amd64 image startup/build evidence, disposable-key signing/mount/runtime integration, and just formatting. Lead reran `just dev-check`, `just --fmt --check --unstable`, and `just dev-signing-smoke` after integration; all passed and owned test resources were removed. ARM64 artifact digests were verified; ARM64 runtime was not executed. Local Git signer-trust configuration is absent; the signed worker commit's integrity was separately checked without changing host trust.
