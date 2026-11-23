@@ -1,0 +1,47 @@
+{
+    "name": "Pocketpull development",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": "."
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "username": "vscode",
+            "installZsh": true,
+            "configureZshAsDefaultShell": true,
+            "installOhMyZsh": false,
+            "installOhMyZshConfig": false,
+            "upgradePackages": false
+        },
+        "ghcr.io/devcontainers/features/git:1": {
+            "version": "2.56.1",
+            "ppa": false
+        },
+        "ghcr.io/devcontainers/features/github-cli:1": {
+            "version": "2.105.0"
+        },
+        "ghcr.io/devcontainers/features/copilot-cli:1": {
+            "version": "1.0.114"
+        }
+    },
+    "containerUser": "vscode",
+    "remoteUser": "vscode",
+    "containerEnv": {
+        "COPILOT_AUTO_UPDATE": "false",
+        "GOTOOLCHAIN": "local"
+    },
+    "remoteEnv": {
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "${localEnv:OTEL_EXPORTER_OTLP_ENDPOINT}",
+        "OTEL_EXPORTER_OTLP_HEADERS": "${localEnv:OTEL_EXPORTER_OTLP_HEADERS}",
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_CONTENT": "NO_CONTENT"
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly",
+        "source=pocketpull-${devcontainerId}-gh,target=/home/vscode/.config/gh,type=volume",
+        "source=pocketpull-${devcontainerId}-copilot,target=/home/vscode/.copilot,type=volume",
+        "source=pocketpull-${devcontainerId}-history,target=/home/vscode/.shell-history,type=volume"
+    ],
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "waitFor": "postCreateCommand"
+}
