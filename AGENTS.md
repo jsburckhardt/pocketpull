@@ -20,7 +20,7 @@ Skills: `.github/skills/`. Use them in this order:
 - `devcontainer up --workspace-folder .`: start the non-root workspace (requires host `~/.ssh`).
 - `devcontainer exec --workspace-folder . just dev-smoke`: exercise installed tools, user, mounts and shell history.
 - `just dev-signing-smoke`: host-only disposable-key devcontainer integration; verifies SSH-signed commits through the read-only SSH mount and cleans up its own resources.
-- `devcontainer exec --workspace-folder . just dev-telemetry-smoke`: authenticated, container-only clean-profile Copilot/loopback OTLP protobuf check; currently fails on pinned Copilot's `enduser.pseudo.id` privacy blocker (see README).
+- `devcontainer exec --workspace-folder . just dev-telemetry-smoke`: authenticated, container-only clean-profile Copilot/loopback OTLP protobuf check; permits only the automatic `enduser.pseudo.id` identity field and rejects other identity/content capture (see README).
 
-See README.md for development authentication/signing, optional external telemetry, scope boundaries and prerequisites. No collector/application checks exist. Telemetry is off without a supplied endpoint; external use remains blocked pending the T2 privacy decision in #2.
+See README.md for development authentication/signing, optional external telemetry, scope boundaries and prerequisites. No collector/application checks exist. Telemetry is off without a supplied endpoint. Under #2 D21, only automatic `enduser.pseudo.id` is permitted; it can correlate sessions and is not assumed anonymous. Keep identity/content capture disabled; all other enduser fields, names, raw IDs and OS/host identity remain prohibited.
 <!-- soft-factory-v2:end -->

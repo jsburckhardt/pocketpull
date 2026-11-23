@@ -235,7 +235,7 @@ def main():
             leaked = set()
             forbidden = re.compile(
                 r"^(user\.name|user\.id|process\.user\.name|host\.name|"
-                r"enduser\..*|gen_ai\.(input\.messages|output\.messages|"
+                r"enduser\.(?!pseudo\.id$).*|gen_ai\.(input\.messages|output\.messages|"
                 r"system_instructions|prompt|completion|tool\.(call\.arguments|"
                 r"call\.result|definitions)).*|.*(?:tool_arguments|tool_output|"
                 r"policy_detail|policy\.details).*)$"
@@ -260,9 +260,13 @@ def main():
                 )
             assert all(totals.values()), f"Missing actual trace/metric export: {totals}"
             print(f"Observed real OTLP/HTTP protobuf exports: {totals}", flush=True)
-            assert not leaked, f"Content/identity attribute keys exported: {sorted(leaked)}"
+            assert not leaked, (
+                "Prohibited content/identity attribute keys exported "
+                f"(only enduser.pseudo.id permitted): {sorted(leaked)}"
+            )
             print(f"PASS: Copilot 1.0.114 OTLP/HTTP protobuf {totals}; synthetic header "
-                  "received; prompt/response sentinels and content/identity keys absent")
+                  "received; prompt/response sentinels and prohibited content/identity "
+                  "keys absent; only enduser.pseudo.id permitted")
     finally:
         server.shutdown()
         server.server_close()

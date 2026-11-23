@@ -134,17 +134,14 @@ passes only the host's `OTEL_EXPORTER_OTLP_ENDPOINT` and optional
 image), and selects `http/protobuf` and `NO_CONTENT`. It does not set
 `COPILOT_OTEL_ENABLED`, a file exporter, or any capture-enabling settings.
 
-**Current privacy blocker (#2 T2): do not enable external export yet.** The
-pinned Copilot 1.0.114 emitted `enduser.pseudo.id` to the loopback test receiver,
-even with all six `telemetry.capture.*` settings explicitly false in a clean
-profile. The smoke check intentionally fails rather than treating pseudonymous
-identity as approved metadata. Real protobuf traces and metrics, synthetic
-headers, absence of prompt/response sentinels, and the unconfigured path were
-observed; AC8 is not complete. An owner decision or a separately reviewed CLI
-fix/version change is needed before external use. No such change is included.
+Under the owner's explicit privacy decision (#2 D21), only the SDK's automatically
+exported `enduser.pseudo.id` is permitted as account-identity metadata. It can
+correlate sessions and is **not assumed anonymous**. Keep identity and content
+capture disabled: names, raw user IDs, OS/host identity and every other
+`enduser.*` field remain prohibited. The smoke gate allows that exact key only,
+not the namespace.
 
-The external connection contract below is for use **after that blocker is
-resolved**. An externally managed OTLP/HTTP collector must be reachable from
+An externally managed OTLP/HTTP collector must be reachable from
 the container. Use its base OTLP URL, not a gRPC endpoint or an Application
 Insights connection string. Copilot appends `/v1/traces` and `/v1/metrics`.
 No host alias is assumed: choose the address/DNS and network appropriate for
@@ -218,9 +215,10 @@ inference/credits under your account's policy. One proves the unconfigured path
 is usable; the other targets the loopback receiver with a synthetic header.
 The check decodes actual protobuf resource/scope/span and metric data-point
 envelopes, requires both signals and the header, rejects content sentinels and
-content/identity attribute keys, and stops the receiver/CLI and removes scratch
+prohibited content/identity attribute keys (allowing only `enduser.pseudo.id`),
+and stops the receiver/CLI and removes scratch
 state in `finally` blocks. Authentication, emission or privacy failures are
-nonzero failures, never skips. **Currently it fails on `enduser.pseudo.id`.**
+nonzero failures, never skips.
 This is loopback evidence only, not live Azure delivery or a general audit of
 all tool/content paths. Collector implementation and collector usage
 documentation remain in #1.
