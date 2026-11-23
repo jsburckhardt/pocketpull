@@ -60,7 +60,7 @@ Tracking issue: [#2](https://github.com/jsburckhardt/pocketpull/issues/2). This 
 | D20 | Sequential workspace/signing and telemetry slices with fresh independent reviews. | Shared configuration/docs require one owner at a time; parallelism is not a goal. | delegated |
 
 ## Open questions and spikes
-None. No spike is authorised. If a pinned Copilot build cannot satisfy actual metadata-only OTLP emission, or an authenticated integration check cannot run, report the exact blocker rather than weakening AC8.
+Owner: decide whether the SDK's observed `enduser.pseudo.id` is permitted operational metadata or must remain prohibited identity data. Pinned Copilot 1.0.114 emitted it despite all capture settings being false; no external export or test-gate relaxation is approved. Independent confirmation is pending. No spike is authorised.
 
 ## Tasks
 ### T1 A usable development workspace with signed commits
@@ -82,12 +82,12 @@ None. No spike is authorised. If a pinned Copilot build cannot satisfy actual me
 - Shared files: T2 owns changes to .devcontainer/**, justfile, .gitignore, README.md, AGENTS.md after T1 integrates; no concurrent writer.
 - Resources: One task-specific devcontainer and ephemeral loopback test collector on a dynamically assigned port; only synthetic prompts/test credentials, no private-content export, no detached services after checks.
 - Checks: just dev-check; devcontainer build --workspace-folder .; devcontainer up --workspace-folder .; devcontainer exec --workspace-folder . just dev-smoke; devcontainer exec --workspace-folder . just dev-telemetry-smoke. Prove actual pinned Copilot trace/metric emission to the test collector with supplied headers and no content capture, and prove the unconfigured path remains usable. Escalate missing authentication or unsupported exporter behaviour instead of mocking actual CLI emission.
-- Status: in-progress
-- Worker: branch factory/dev-env-t2; base 353818b3a3e4c481f56402f09c1e819529074dfc; head pending; PID 3358244; log .trees/dev-env-t2.log.
+- Status: review
+- Worker: branch factory/dev-env-t2; base 353818b3a3e4c481f56402f09c1e819529074dfc; head e58c965598163ee932226466c623c74865c38b35; PID 3358244 exited with no surviving group processes; log .trees/dev-env-t2.log. Builder reports blocked AC8: real OTLP emitted enduser.pseudo.id despite disabled capture; independent review pending. Not integrated.
 
 ## Status
 delivering
 
-Owner approved #2 delivery via factory-slice followed by factory-deliver as Lead. T1 passed independent acceptance and integrated unchanged; combined configuration, just formatting, and disposable-key devcontainer signing/runtime checks passed on the integration branch. T2 is running from the recorded reviewed integration head. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
+Owner approved #2 delivery via factory-slice followed by factory-deliver as Lead. T1 passed independent acceptance and integrated unchanged; combined configuration, just formatting, and disposable-key devcontainer signing/runtime checks passed on the integration branch. T2 is committed but not integrated: its privacy gate failed and independent acceptance is pending. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
 
 T1 evidence: builder and independent reviewer verified configuration checks, native amd64 image startup/build evidence, disposable-key signing/mount/runtime integration, and just formatting. Lead reran `just dev-check`, `just --fmt --check --unstable`, and `just dev-signing-smoke` after integration; all passed and owned test resources were removed. ARM64 artifact digests were verified; ARM64 runtime was not executed. Local Git signer-trust configuration is absent; the signed worker commit's integrity was separately checked without changing host trust.
