@@ -123,7 +123,7 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Resources: Loopback HTTP fixtures on OS-assigned ports; independent temporary state/raw directories and subprocesses; no production archive
 - Checks: just collector-check; just collector-smoke; just dev-check
 - Status: failed
-- Worker: factory/collector-t3; base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; rejected head c00750a4ab07ca733372e6ffea0f3f79acc6a3d0; PID 27136 exited; correction pending; log .trees/collector-t3.log
+- Worker: factory/collector-t3; base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; rejected head c00750a4ab07ca733372e6ffea0f3f79acc6a3d0; PID 27136 exited. F1 correction factory/collector-t3-r1 from rejected head; head pending; PID 32602 in devcontainer 43753475d620; log .trees/collector-t3-r1.log
 
 ### T4 Interrupted and failing runs retain progress and report a complete operational outcome
 - ACs: AC1, AC2, AC3, AC4, AC5, AC6, AC9 (complete final coverage)
