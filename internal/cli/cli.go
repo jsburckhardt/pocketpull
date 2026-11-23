@@ -79,7 +79,7 @@ func run(ctx context.Context, args []string, lookup environment, stdout, stderr 
 	}
 	log := slog.New(handler).With("run_id", rand.Text())
 	start := time.Now()
-	log.Info("collection started", "event", "run_started")
+	log.Info("collection started", "event", "run_started", "elapsed_ms", 0)
 	summary, err := collector.Run(ctx, collector.Options{
 		RawDir: config.rawDir, APIKey: config.apiKey, StateDir: config.stateDir, RefreshAfter: config.refreshAfter,
 		BaseURL: deps.baseURL, Client: deps.client, Log: log,
@@ -87,15 +87,18 @@ func run(ctx context.Context, args []string, lookup environment, stdout, stderr 
 	level := slog.LevelInfo
 	if err != nil {
 		level = slog.LevelError
-		log.Error("collection incomplete", "event", "run_failed", "reason", err.Error())
+		log.Error("collection incomplete", "event", "run_failed",
+			"elapsed_ms", time.Since(start).Milliseconds(), "reason", err.Error())
 	}
 	log.Log(ctx, level, "collection summary", "event", "summary",
 		"elapsed_ms", time.Since(start).Milliseconds(),
 		"discovered", summary.Discovered, "fetched", summary.Fetched,
 		"unchanged", summary.Unchanged, "cached", summary.Cached,
-		"pending", summary.Pending, "failed", summary.Failed, "retries", 0)
+		"pending", summary.Pending, "failed", summary.Failed, "retries", summary.Retries,
+		"complete", err == nil)
 	if err != nil {
 		return 1
 	}
+	log.Info("collection completed", "event", "run_end", "elapsed_ms", time.Since(start).Milliseconds())
 	return 0
 }

@@ -4,7 +4,7 @@ Scheduled Pocket transcript collector.
 
 Delivery skills in `.github/skills/` are vendored from jsburckhardt/toolio `soft-factory-v2` at `3d07eb5`.
 
-## Collector: current T3 collection, freshness and locking
+## Collector: run-once native collection
 
 `pocketpull` is a native run-once Go CLI, not a scheduler. It lists every account
 page from `https://public.heypocketai.com/api/v1/public/recordings?page=1&limit=100`,
@@ -28,6 +28,12 @@ export POCKETPULL_API_KEY
 "$build_dir/pocketpull" --raw-dir "$HOME/pocket-raw"
 unset POCKETPULL_API_KEY
 ```
+
+The binary needs no Go/Python/Node runtime on the collection host. To build
+either Linux target, use `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o
+pocketpull-amd64 ./cmd/pocketpull` or the same command with `GOARCH=arm64` and
+`-o pocketpull-arm64`. Build tools are needed only on the build host; choose the
+binary matching the collection host's architecture.
 
 ### Configuration and credentials
 
@@ -120,7 +126,7 @@ Raw snapshots are committed before atomic state writes, and successful progress
 is persisted per recording, not only at the end of traversal. Interruption can
 require a repeat fetch but cannot make an uncommitted raw snapshot fresh.
 
-### Raw artifacts and current resilience
+### Raw artifacts and failure recovery
 
 Each snapshot is `<raw-dir>/<recording-id>/recording.json`: the **entire detail
 `data` object**, not its envelope. Unknown fields and exact large JSON integers
@@ -140,34 +146,67 @@ An upstream edit or completed transcript can take up to `refresh_after`
 (24 hours by default) plus the cron interval and run time to appear. No guarantee
 applies to content that disappears before a successful fetch. Zero refresh
 reduces this latency to the cron interval plus run time, at the cost of fetching
-every detail on every run. Bounded retries and comprehensive fault/interruption
-handling remain T4 work; this version makes one attempt per request.
-Requests have a 30-second timeout and a 32 MiB response limit; oversized
-responses fail without replacing prior data. HTTP redirects are not followed.
+every detail on every run.
+
+Both listing and detail requests retry transient network failures (including
+timeouts, connection resets and truncated response bodies), HTTP 429, and HTTP
+500-599. Each request has at most **four attempts**, with backoff of 500 ms,
+1 second and 2 seconds. A valid `Retry-After` integer in seconds or HTTP date
+can lengthen a backoff, but is capped at **10 seconds**. Invalid, negative,
+overflowing or past values do not extend the backoff. Each attempt has a
+**30-second timeout**, covering response-body reading, and a **32 MiB response
+limit**. The complete request therefore has at most 120 seconds of request
+time plus 30 seconds of retry waits (excluding local processing); no upstream
+numeric quota is assumed. Oversized or malformed successes, permanent 4xx and
+redirects are not retried; redirects are never followed. 401/403 stop all
+further list/detail work immediately.
+
+Individual detail/validation/storage failures do not prevent other distinct
+IDs from being processed; a failed listing stops traversal rather than claiming
+it finished. Required failures exit nonzero while retaining successful partial
+work and prior snapshots. SIGINT/SIGTERM cancel in-flight requests and backoff
+promptly, report an incomplete summary, and release the lock. SIGKILL cannot
+report a summary but also releases the lock. Restart uses per-record committed
+freshness, safely refetches unfinished work, and never needs a lock-file removal.
+A killed write can leave an uncommitted `.recording-*.tmp` file; it is not an
+archive snapshot or freshness entry and is never used on restart. Gracefully
+canceled writes clean up their temporary files.
 
 ### Logs and exit status
 
 Go `slog` operational logs go to stderr; collection/error stdout remains empty.
 `log_format`/`--log-format` accepts `json` (default) or `text`.
 `log_level`/`--log-level` accepts `info` (default), `debug`, `warn`, or `error`:
-`info` includes start, fetched-record and summary events; `debug` additionally
-includes page-request and cache-hit events without request contents; `warn` suppresses
-info/debug; `error` shows errors only. Successful summaries are info-level,
+`info` includes start, fetched-record, summary and successful `run_end` events;
+`debug` additionally includes page-request and cache-hit events without request
+contents; `warn` includes retry and state warnings but suppresses info/debug;
+`error` shows errors only. Successful summaries are info-level,
 incomplete-run summaries are error-level. Invalid configuration always uses a
 safe JSON/error baseline, even if it attempted to select another format/level.
-Events include a run ID, recording ID where safe, and a final summary with
-`elapsed_ms`. `discovered` counts unique safe IDs visited, `fetched` counts
+Events include a random, identity-free run ID, recording ID where safe, elapsed
+time for detail/retry/run outcomes, and a final summary with `elapsed_ms` and
+`complete`. Only successful runs emit `run_end`. `request_retry` warnings include
+the failed attempt number, maximum attempts, operation, redacted reason and
+planned delay; canceled waits do not count as additional attempts.
+`discovered` counts unique IDs in validated listing pages, including rejected
+unsafe IDs and IDs not attempted after interruption/authentication failure;
+it does not claim unseen later pages were traversed. `fetched` counts
 successfully validated and stored/unchanged details, `unchanged` is a subset
 of `fetched`, and `pending` counts fetched records with missing/null transcript.
 `cached` counts usable snapshots skipped by freshness (not fetched this run).
-`failed` counts failed listing/detail/storage/state work or rejected IDs;
-`retries` remains zero until T4. A fetched snapshot can also have a state-write
-failure, so counts need not partition `discovered`. Logs exclude titles, transcript/summary content,
+`pending` is based only on fetched detail data, never inferred for cache skips.
+`failed` counts failed listing/detail/storage/state work, rejected IDs and
+run-level coordination/interruption failures, not each failed retry attempt;
+`retries` counts additional request attempts actually started after backoff.
+A fetched snapshot can also have a state-write failure, and listing/run failures
+have no recording ID, so counts need not partition `discovered`.
+Logs exclude titles, transcript/summary content,
 HTTP bodies, headers, keys, URLs and raw transport/filesystem errors.
 Individual detail failures retain partial progress and exit nonzero; 401/403
 stop promptly. Exit zero includes valid pending records, not necessarily
-finished upstream transcripts. Comprehensive interruption/retry handling and
-complete resilience/count evidence remain T4 work.
+finished upstream transcripts. Exit 1 means invalid configuration, overlap,
+interruption or incomplete required work. Help/version exit zero without
+collecting; normal successful collection also exits zero.
 
 ### Cron
 
@@ -197,8 +236,8 @@ external tooling own scheduling and log rotation. There is no application log
 manager or telemetry exporter. At the default refresh interval this hourly
 schedule can take up to 25 hours plus run time to capture an edit. To force an
 immediate full refresh, invoke the same configuration with `--refresh-after 0`.
-Bounded retries, comprehensive faults/interruption and final logging coverage
-remain deferred to T4; current checks are not full collector acceptance.
+These examples do not imply a live Pocket pilot, release publication or cloud
+validation.
 
 ```sh
 just collector-check

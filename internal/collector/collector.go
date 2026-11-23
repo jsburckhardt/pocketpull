@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -23,6 +21,8 @@ type Options struct {
 	StateDir     string
 	RefreshAfter time.Duration
 	Now          func() time.Time
+	Sleep        func(context.Context, time.Duration) error
+	retries      *int
 }
 
 type Summary struct {
@@ -32,6 +32,7 @@ type Summary struct {
 	Cached     int
 	Pending    int
 	Failed     int
+	Retries    int
 }
 
 var (
@@ -48,13 +49,23 @@ func Run(ctx context.Context, options Options) (Summary, error) {
 	if options.Now == nil {
 		options.Now = time.Now
 	}
+	if options.Sleep == nil {
+		options.Sleep = sleep
+	}
+	options.retries = &summary.Retries
 	store, err := coordinate(options)
 	if err != nil {
 		summary.Failed++
 		return summary, err
 	}
 	defer store.close()
-	client := *options.Client
+	client := http.Client{}
+	if options.Client != nil {
+		client = *options.Client
+	}
+	if client.Timeout <= 0 || client.Timeout > requestTimeout {
+		client.Timeout = requestTimeout
+	}
 	client.CheckRedirect = func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
@@ -62,7 +73,7 @@ func Run(ctx context.Context, options Options) (Summary, error) {
 	seen := make(map[string]bool)
 	for page := 1; ; page++ {
 		options.Log.Debug("listing page", "event", "page_requested", "page", page)
-		body, err := request(ctx, options, "/public/recordings?page="+strconv.Itoa(page)+"&limit=100")
+		body, err := request(ctx, options, "/public/recordings?page="+strconv.Itoa(page)+"&limit=100", "")
 		if err != nil {
 			summary.Failed++
 			return summary, err
@@ -83,30 +94,36 @@ func Run(ctx context.Context, options Options) (Summary, error) {
 			summary.Failed++
 			return summary, errors.New("invalid listing response")
 		}
+		var unique []string
 		for _, record := range records {
-			if !safeID.MatchString(record.ID) {
-				summary.Failed++
-				options.Log.Error("unsafe recording ID rejected", "event", "recording_failed", "reason", "invalid_id")
-				continue
-			}
 			if seen[record.ID] {
 				continue
 			}
 			seen[record.ID] = true
 			summary.Discovered++
+			unique = append(unique, record.ID)
+		}
+		for _, id := range unique {
 			if ctx.Err() != nil {
+				summary.Failed++
 				return summary, errInterrupted
 			}
-			if store.fresh(record.ID, options.Now(), options.RefreshAfter) {
-				summary.Cached++
-				options.Log.Debug("recording cached", "event", "recording_cached", "recording_id", record.ID)
+			if !safeID.MatchString(id) {
+				summary.Failed++
+				options.Log.Error("unsafe recording ID rejected", "event", "recording_failed", "reason", "invalid_id")
 				continue
 			}
-			data, pending, err := detail(ctx, options, record.ID)
+			if store.fresh(id, options.Now(), options.RefreshAfter) {
+				summary.Cached++
+				options.Log.Debug("recording cached", "event", "recording_cached", "recording_id", id)
+				continue
+			}
+			started := time.Now()
+			data, pending, err := detail(ctx, options, id)
 			if err == nil {
 				completed := options.Now()
 				var changed bool
-				changed, err = snapshot(ctx, store.raw, record.ID, data)
+				changed, err = snapshot(ctx, store.raw, id, data)
 				if err == nil {
 					summary.Fetched++
 					if !changed {
@@ -115,15 +132,17 @@ func Run(ctx context.Context, options Options) (Summary, error) {
 					if pending {
 						summary.Pending++
 					}
-					options.Log.Info("recording fetched", "event", "recording_fetched", "recording_id", record.ID, "changed", changed, "pending", pending)
-					err = store.remember(ctx, record.ID, completed)
+					options.Log.Info("recording fetched", "event", "recording_fetched", "recording_id", id,
+						"elapsed_ms", time.Since(started).Milliseconds(), "changed", changed, "pending", pending)
+					err = store.remember(ctx, id, completed)
 					if err == nil {
 						continue
 					}
 				}
 			}
 			summary.Failed++
-			options.Log.Error("recording failed", "event", "recording_failed", "recording_id", record.ID, "reason", err.Error())
+			options.Log.Error("recording failed", "event", "recording_failed", "recording_id", id,
+				"elapsed_ms", time.Since(started).Milliseconds(), "reason", err.Error())
 			if errors.Is(err, errAuth) || ctx.Err() != nil {
 				return summary, err
 			}
@@ -132,46 +151,18 @@ func Run(ctx context.Context, options Options) (Summary, error) {
 			break
 		}
 	}
+	if ctx.Err() != nil {
+		summary.Failed++
+		return summary, errInterrupted
+	}
 	if summary.Failed != 0 {
 		return summary, errIncomplete
 	}
 	return summary, nil
 }
 
-func request(ctx context.Context, options Options, route string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, options.BaseURL+route, nil)
-	if err != nil {
-		return nil, errors.New("request setup failed")
-	}
-	req.Header.Set("Authorization", "Bearer "+options.APIKey)
-	req.Header.Set("Accept", "application/json")
-	response, err := options.Client.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil, errInterrupted
-		}
-		return nil, errors.New("transport failed")
-	}
-	defer response.Body.Close()
-	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
-		return nil, errAuth
-	}
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http status %d", response.StatusCode)
-	}
-	const maxResponseBytes = 32 << 20
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
-	if err != nil {
-		return nil, errors.New("response read failed")
-	}
-	if len(body) > maxResponseBytes {
-		return nil, errors.New("response too large")
-	}
-	return body, nil
-}
-
 func detail(ctx context.Context, options Options, id string) (json.RawMessage, bool, error) {
-	body, err := request(ctx, options, "/public/recordings/"+id)
+	body, err := request(ctx, options, "/public/recordings/"+id, id)
 	if err != nil {
 		return nil, false, err
 	}

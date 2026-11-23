@@ -10,10 +10,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -27,10 +29,13 @@ func TestCLIProcess(t *testing.T) {
 	if os.Getenv("POCKETPULL_TEST_PROCESS") != "1" {
 		return
 	}
-	os.Exit(run(context.Background(), os.Args[stringsIndex(os.Args, "--")+1:], os.LookupEnv, os.Stdout, os.Stderr, dependencies{
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code := run(ctx, os.Args[stringsIndex(os.Args, "--")+1:], os.LookupEnv, os.Stdout, os.Stderr, dependencies{
 		baseURL: os.Getenv("POCKETPULL_TEST_ENDPOINT"),
 		client:  &http.Client{Timeout: 30 * time.Second},
-	}))
+	})
+	stop()
+	os.Exit(code)
 }
 
 func stringsIndex(values []string, target string) int {
