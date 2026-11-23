@@ -11,3 +11,7 @@ dev-smoke:
 # Host: boot an isolated devcontainer with disposable SSH keys; clean up on exit.
 dev-signing-smoke:
     python3 .devcontainer/signing-smoke.py
+
+# Inside the devcontainer: real authenticated CLI emission to an ephemeral loopback receiver.
+dev-telemetry-smoke:
+    python3 .devcontainer/telemetry-smoke.py
