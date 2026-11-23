@@ -88,9 +88,9 @@ None. Owner resolved the pseudonymous-field boundary in D21. No spike, CLI versi
 - Worker: correction branch factory/dev-env-t2-r1; base 6c956ca8782335c911fa43956d5150625e95ab62; accepted head 011992788a514be2cb33091fb8136450c04d175e; worker PID 3583019 exited with no surviving group processes; log .trees/dev-env-t2-r1.log. Lead exclusively repaired implementation F2 after independent failure at c63a313, without amending commits. Independent acceptance passed revised AC8, AC9 and preserved AC7 with no unresolved findings; integrated unchanged by signed merge.
 
 ## Status
-delivering
+pr-open
 
-Both tasks are independently accepted and integrated unchanged. T1 passed at da30c5322a2b56b6931838bc063482531ecd8968; T2 passed at 011992788a514be2cb33091fb8136450c04d175e after owner D21 resolved F1 and the Lead repaired F2 with persistent regressions. Final combined checks passed; independent final-SHA acceptance is pending before PR publication. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
+Both tasks are independently accepted and integrated unchanged. T1 passed at da30c5322a2b56b6931838bc063482531ecd8968; T2 passed at 011992788a514be2cb33091fb8136450c04d175e after owner D21 resolved F1 and the Lead repaired F2 with persistent regressions. Independent final acceptance passed e6cc0ccd06c57644262f9a3d11ec460127cd290a against main fc531fe320fe7dac4cfc02a9814e146a90a4d49f with no unresolved findings. [PR #3](https://github.com/jsburckhardt/pocketpull/pull/3) is open targeting main. This publication-status update changes no implementation. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
 
 T1 evidence: builder and independent reviewer verified configuration checks, native amd64 image startup/build evidence, disposable-key signing/mount/runtime integration, and just formatting. Lead reran `just dev-check`, `just --fmt --check --unstable`, and `just dev-signing-smoke` after integration; all passed and owned test resources were removed. ARM64 artifact digests were verified; ARM64 runtime was not executed. Local Git signer-trust configuration is absent; the signed worker commit's integrity was separately checked without changing host trust.
 
