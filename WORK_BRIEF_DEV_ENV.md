@@ -71,8 +71,8 @@ None. No spike is authorised. If a pinned Copilot build cannot satisfy actual me
 - Shared files: .devcontainer/**, justfile, .gitignore, README.md, AGENTS.md are owned by T1 until integration; T2 may change them only after T1 integrates.
 - Resources: One task-specific devcontainer and disposable local signing-test directory; no production keys copied or services left running.
 - Checks: just dev-check; devcontainer build --workspace-folder .; devcontainer up --workspace-folder .; devcontainer exec --workspace-folder . just dev-smoke. Document and run a disposable-key check that proves SSH signing through a read-only host-directory mount, plus non-root/tool/mount/no-auto-start checks. Planned recipes must exercise actual behaviour, not placeholders.
-- Status: ready
-- Worker: None
+- Status: review
+- Worker: branch factory/dev-env-t1; base 19d192e45ab8524530d1fb0b49a6b96b4c85a547; head da30c5322a2b56b6931838bc063482531ecd8968; PID 3283528 exited with no surviving group processes; log .trees/dev-env-t1.log. Independent acceptance pending.
 
 ### T2 Observable Copilot sessions without content capture
 - ACs: AC8, AC9
@@ -86,6 +86,8 @@ None. No spike is authorised. If a pinned Copilot build cannot satisfy actual me
 - Worker: None
 
 ## Status
-go
+delivering
 
-Owner approved #2 delivery via factory-slice followed by factory-deliver as Lead. Sequential T1/T2 slices cover every AC; T2 waits for reviewed and integrated T1. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
+Owner approved #2 delivery via factory-slice followed by factory-deliver as Lead. T1 is committed and undergoing independent acceptance; T2 waits for reviewed and integrated T1. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
+
+T1 builder evidence: configuration checks, native amd64 image build, disposable-key signing/mount/runtime integration, and just formatting passed. ARM64 artifact digests were verified; ARM64 runtime was not executed. The worker's final commit is SSH-signed; local Git signer-trust configuration is absent, so the worker separately checked signature integrity without changing host trust. Builder evidence does not substitute for independent acceptance.
