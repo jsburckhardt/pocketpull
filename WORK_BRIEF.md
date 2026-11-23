@@ -122,8 +122,8 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T3 until integration, then transferred serially to its dependant
 - Resources: Loopback HTTP fixtures on OS-assigned ports; independent temporary state/raw directories and subprocesses; no production archive
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: ready
-- Worker: None
+- Status: in-progress
+- Worker: factory/collector-t3; base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; head pending; PID 27136 in devcontainer 43753475d620; log .trees/collector-t3.log
 
 ### T4 Interrupted and failing runs retain progress and report a complete operational outcome
 - ACs: AC1, AC2, AC3, AC4, AC5, AC6, AC9 (complete final coverage)
