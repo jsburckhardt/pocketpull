@@ -28,7 +28,7 @@ func snapshot(ctx context.Context, root *os.Root, id string, data json.RawMessag
 	}
 	defer directory.Close()
 	const name = "recording.json"
-	previous, err := regularFile(directory, name, 32<<20, false)
+	previous, err := regularFile(directory, name, 0, false)
 	if err == nil && sameJSON(previous, data) {
 		return false, nil
 	}

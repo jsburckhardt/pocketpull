@@ -158,7 +158,7 @@ func (store *coordination) fresh(id string, now time.Time, interval time.Duratio
 		return false
 	}
 	defer directory.Close()
-	data, err = regularFile(directory, "recording.json", 32<<20, false)
+	data, err = regularFile(directory, "recording.json", 0, false)
 	if err != nil {
 		return false
 	}
@@ -183,12 +183,13 @@ func (store *coordination) remember(ctx context.Context, id string, completed ti
 	return nil
 }
 
+// A zero limit permits formatted snapshots of any size; private state is bounded.
 func regularFile(root *os.Root, name string, limit int64, private bool) ([]byte, error) {
 	info, err := root.Lstat(name)
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Size() > limit {
+	if !info.Mode().IsRegular() || (limit > 0 && info.Size() > limit) {
 		return nil, errors.New("file unusable")
 	}
 	if private {
@@ -202,8 +203,12 @@ func regularFile(root *os.Root, name string, limit int64, private bool) ([]byte,
 		return nil, err
 	}
 	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, limit+1))
-	if err != nil || int64(len(data)) > limit {
+	var reader io.Reader = file
+	if limit > 0 {
+		reader = io.LimitReader(file, limit+1)
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil || (limit > 0 && int64(len(data)) > limit) {
 		return nil, errors.New("file read failed")
 	}
 	return data, nil

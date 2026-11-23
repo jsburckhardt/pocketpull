@@ -146,6 +146,112 @@ func testOptions(t *testing.T, server *httptest.Server) Options {
 	}
 }
 
+func TestExpandedSnapshotFreshnessAndReplacement(t *testing.T) {
+	// Tiny values expand past the transport limit when indented, without a
+	// large HTTP body or millions of decoded numbers.
+	values := strings.Repeat("[", 32) + strings.Repeat("null,", 499999) + "null" + strings.Repeat("]", 32)
+	data := func(title string) string {
+		return fmt.Sprintf(`{"id":"r","title":%q,"future":9007199254740993,"tiny":%s}`, title, values)
+	}
+	var changed atomic.Bool
+	var details, listings atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer fixture-key" {
+			t.Error("missing Bearer authentication")
+		}
+		switch r.URL.RequestURI() {
+		case "/public/recordings?page=1&limit=100":
+			listings.Add(1)
+			fmt.Fprint(w, `{"success":true,"data":[{"id":"r"}],"pagination":{"page":1,"has_more":false}}`)
+		case "/public/recordings/r":
+			details.Add(1)
+			title := "old"
+			if changed.Load() {
+				title = "new"
+			}
+			body := `{"success":true,"data":` + data(title) + "}"
+			if len(body) >= 32<<20 {
+				t.Error("fixture exceeds HTTP response limit")
+			}
+			fmt.Fprint(w, body)
+		default:
+			t.Error("unexpected request, including audio")
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	options := testOptions(t, server)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	options.Now = func() time.Time { return now }
+	runs, fetches := int32(0), int32(0)
+	run := func(stage string, want Summary) {
+		t.Helper()
+		runs++
+		fetches += int32(want.Fetched)
+		summary, err := Run(context.Background(), options)
+		if err != nil || summary != want || listings.Load() != runs || details.Load() != fetches {
+			t.Fatalf("%s: summary=%+v err=%v listings=%d details=%d; want %+v listings=%d details=%d",
+				stage, summary, err, listings.Load(), details.Load(), want, runs, fetches)
+		}
+	}
+	path := filepath.Join(options.RawDir, "r", "recording.json")
+	checkOutput := func(title string) os.FileInfo {
+		t.Helper()
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Size() <= 32<<20 {
+			t.Fatalf("fixture did not expand past HTTP limit: %d bytes", info.Size())
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, raw); err != nil || compact.String() != data(title) {
+			t.Fatalf("snapshot lost detail data: %v", err)
+		}
+		entries, err := os.ReadDir(filepath.Dir(path))
+		if err != nil || len(entries) != 1 || entries[0].Name() != "recording.json" {
+			t.Fatalf("unexpected snapshot files: %v, %v", entries, err)
+		}
+		return info
+	}
+	unchanged := func(before os.FileInfo) {
+		t.Helper()
+		after, err := os.Stat(path)
+		if err != nil || !os.SameFile(before, after) || !before.ModTime().Equal(after.ModTime()) {
+			t.Fatal("unchanged snapshot inode or mtime changed")
+		}
+	}
+	fetched := Summary{Discovered: 1, Fetched: 1, Pending: 1}
+	run("initial collection", fetched)
+	before := checkOutput("old")
+	t.Logf("expanded snapshot: %d bytes", before.Size())
+	run("fresh repeat", Summary{Discovered: 1, Cached: 1})
+	unchanged(before)
+	options.RefreshAfter = 0
+	refreshed := fetched
+	refreshed.Unchanged = 1
+	run("forced unchanged refresh", refreshed)
+	unchanged(before)
+	options.RefreshAfter = 24 * time.Hour
+	now = now.Add(24 * time.Hour)
+	run("expired unchanged refresh", refreshed)
+	unchanged(before)
+	changed.Store(true)
+	options.RefreshAfter = 0
+	run("changed refresh", fetched)
+	after := checkOutput("new")
+	if os.SameFile(before, after) {
+		t.Fatal("changed snapshot was not atomically replaced")
+	}
+	options.RefreshAfter = 24 * time.Hour
+	run("fresh changed repeat", Summary{Discovered: 1, Cached: 1})
+	unchanged(after)
+}
+
 func TestFreshnessUsesCompletedFetchAndCommitsOnlySuccess(t *testing.T) {
 	var clock atomic.Int64
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
