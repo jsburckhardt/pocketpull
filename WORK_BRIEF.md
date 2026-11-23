@@ -111,8 +111,8 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, go.mod, go.sum, justfile, AGENTS.md, README.md owned by T2 until integration, then transferred serially to its dependant
 - Resources: Loopback HTTP fixture on an OS-assigned port; temporary config/secret/raw directories only
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: in-progress
-- Worker: factory/collector-t2; base 7649fb6448124dd30171658ee6fe96c56e3ac7a0; head pending; PID 21922 in devcontainer 43753475d620; log .trees/collector-t2.log
+- Status: integrated
+- Worker: factory/collector-t2; base 7649fb6448124dd30171658ee6fe96c56e3ac7a0; accepted head 56c9f6890e57b1d7ebe6783a24d4e2e4c29cb507; integrated as af443b07838778b8c3c0eeee791de32d5540e025; PID 21922 exited; log .trees/collector-t2.log
 
 ### T3 Thousand-record repeated collections refresh safely without overlap
 - ACs: AC3, AC4, AC5, AC9; AC2, AC6 regression
@@ -122,7 +122,7 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T3 until integration, then transferred serially to its dependant
 - Resources: Loopback HTTP fixtures on OS-assigned ports; independent temporary state/raw directories and subprocesses; no production archive
 - Checks: just collector-check; just collector-smoke; just dev-check
-- Status: blocked
+- Status: ready
 - Worker: None
 
 ### T4 Interrupted and failing runs retain progress and report a complete operational outcome
@@ -149,3 +149,11 @@ Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and devel
 - AC1: both CGO-free target builds, native fixture subprocess and application help/version pass. AC3: multipage deduplication/immediate details pass; cache/1,000-record evidence deferred. AC4: lossless complete data, safe folders, changed-only atomic writes and failure preservation pass. AC5: partial progress/auth-stop/pending/cancellation cases pass; locks/retries deferred. AC6: redacted JSON stderr, empty stdout and summary pass; full formats/severities deferred. AC9: current behavior documented with explicit limitations; complete configuration/cache/retries deferred.
 - Reviewer checks: just collector-check; just collector-smoke; just dev-check; go test -race -count=1 ./...; credential-free native help/version. All exit 0 in the non-root devcontainer. Findings: none.
 - Lead combined checks after exact serial cherry-pick: just collector-check; just collector-smoke; just dev-check. All exit 0. Signed worker commit verified; no surviving processes in PGID 887. T2 unlocked.
+
+### T2 independent task acceptance
+- Verdict: pass for complete AC2 and T2-owned AC6/AC9 plus accepted T1 regressions; state/cache/locking/retries remain deferred to T3/T4.
+- Reviewer: fresh-context accept-collector-t2, factory-accept/factory-design; no repairs or record edits.
+- Base: 7649fb6448124dd30171658ee6fe96c56e3ac7a0. Reviewed head: 56c9f6890e57b1d7ebe6783a24d4e2e4c29cb507. Integration: af443b07838778b8c3c0eeee791de32d5540e025.
+- AC2: single strict YAML discovery/precedence/path/type/default validation, help/version bypass, nonempty unique credential source and owner-only regular secret files pass. AC6: JSON/text/severity options and malicious-input/transport/content redaction pass. AC9: executable config/secret examples and accurate cron/limits documentation pass. AC1/AC4/AC5: native builds/smokes and snapshot/partial-progress regressions pass.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; go test -race -count=1 ./...; git diff --check. All exit 0 in non-root devcontainer; exact clean head verified. Findings: none.
+- Lead combined checks after exact serial cherry-pick: just collector-check; just collector-smoke; just dev-check. All exit 0. Signed worker head verified; no surviving processes in PGID 21922. T3 unlocked.
