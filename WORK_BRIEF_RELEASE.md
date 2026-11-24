@@ -55,8 +55,8 @@ None. GitHub documents GITHUB_TOKEN-generated PR workflows may require approval,
 - Shared files: scripts/**, justfile, AGENTS.md, README.md owned by T1 until integration then T2; Lead owns all work briefs
 - Resources: Temporary output/install/fixture directories; loopback ports only if needed; no public release, real credentials or cron
 - Checks: just distribution-check; just collector-check; just collector-smoke; just dev-check
-- Status: in-progress
-- Worker: factory/release-t1; base dd5ec0af28011ad14b0df1e6bc9847a4077875d4; head pending; PID 324 in devcontainer 43753475d620; log .trees/release-t1.log
+- Status: integrated
+- Worker: factory/release-t1; base dd5ec0af28011ad14b0df1e6bc9847a4077875d4; accepted head a4dab870d43307fac0d27dd5f813e52886f51134; integrated unchanged as 5c605f891f464a2a1f567aad741e7176a7e0dd6d; PID 324 exited; log .trees/release-t1.log
 
 ### T2 Conventional Commits produce an owner-merged release PR and tested installable assets
 - ACs: AC1, AC2, AC3, AC4, AC5, AC6, AC7
@@ -66,10 +66,12 @@ None. GitHub documents GITHUB_TOKEN-generated PR workflows may require approval,
 - Shared files: scripts/**, justfile, AGENTS.md, README.md owned by T2; Lead owns briefs/final evidence/publication
 - Resources: Temporary packaging/install/version-policy fixtures; GitHub PR CI only after reviewed publication; no real release/tag/merge
 - Checks: just distribution-check; just collector-check; just collector-smoke; just dev-check
-- Status: blocked
+- Status: ready
 - Worker: None
 
 ## Status
 delivering
 
 Owner scope and go agreed. main default and collector #1 closure verified; master preserved. Base afed54e4b03d139d13d5b989ab04dadcf9c46925. Lead branch delivery/5-release-distribution. Follow independent review and serial integration; one final PR, no merge/release. Record final verdict/publication in the existing issue/PR to preserve exact reviewed SHA.
+
+T1 task acceptance: fresh-context accept-release-t1 (factory-accept/factory-design), verdict pass for AC2 local/config portion, AC3, AC4 and AC7 T1 portion. Base dd5ec0af28011ad14b0df1e6bc9847a4077875d4; reviewed head a4dab870d43307fac0d27dd5f813e52886f51134. All four required just checks pass non-root; actionlint v1.7.12 passes via cached source. Reviewer additionally verified actual archive-download TERM cleanup and architecture aliases. Minor F1: scripts/test_distribution.py:347-356 signals during latest resolution before scratch exists; T2 owns strengthening it to an exact-version download with scratch-exists assertion. No blocker/major finding. Cloud PR CI remains final publication evidence, not locally claimed. Lead verified signature, exited PGID 324, integrated exact unchanged patch as 5c605f891f464a2a1f567aad741e7176a7e0dd6d, and reran just distribution-check; just collector-check; just collector-smoke; just dev-check: all exit 0. T2 unlocked.
