@@ -35,3 +35,13 @@ collector-check:
 # Collector: native subprocess, flags/config/secret-file loopback paths, no real key.
 collector-smoke:
     go test ./internal/cli -run '^TestNativeSmoke$' -count=1
+
+# Distribution: real two-arch packaging plus fake-download installer integration tests.
+distribution-check:
+    bash -n install.sh
+    bash -n scripts/package-release.sh
+    python3 scripts/test_distribution.py
+
+# Distribution: build release archives/checksums for VERSION into a new OUTPUT_DIR.
+package-release version output_dir:
+    bash scripts/package-release.sh {{quote(version)}} {{quote(output_dir)}}

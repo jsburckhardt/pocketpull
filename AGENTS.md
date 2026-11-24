@@ -17,6 +17,9 @@ Skills: `.github/skills/`. Use them in this order:
 ## Commands
 - `just collector-check`: reject unformatted Go, run `go vet` and `go test -race`, and build CGO-free Linux amd64/arm64 binaries in a cleaned temporary directory.
 - `just collector-smoke`: native CLI subprocess collects one recording from a loopback HTTP fixture using environment/flags and config-file/secret-file with CLI overrides, without real credentials.
+- `just distribution-check`: syntax-check `install.sh` and `scripts/package-release.sh`, package two real versions into temporary directories (archives, checksums, static ELF arch, native `--version`), and run installer subprocess tests against fake `curl`/`uname` release downloads, without network or credentials.
+- `just package-release VERSION OUTPUT_DIR` (`scripts/package-release.sh`): build `pocketpull_<version>_linux_{amd64,arm64}.tar.gz` and `checksums.txt` with the pinned Go, CGO-free and version-injected, into a new directory created only on success.
+- CI (`.github/workflows/ci.yml`, PRs to/pushes on `main`): read-only token runs `just distribution-check`, `just collector-check`, `just collector-smoke` and `just dev-check`; validate edits with `actionlint` (e.g. `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` from outside the module).
 - `just dev-check`: host/container configuration, feature-lock, shell-syntax and recipe checks.
 - `devcontainer build --workspace-folder .`: build the pinned Ubuntu workspace.
 - `devcontainer up --workspace-folder .`: start the non-root workspace (requires host `~/.ssh`).

@@ -252,6 +252,114 @@ subprocess through the real CLI entry using an internal, test-only fixture seam,
 covering environment/flags and config-file/secret-file with CLI overrides;
 neither command contacts Pocket or needs real credentials.
 
+## Installation and distribution
+
+> **Status:** no pocketpull release has been published yet. The installer and
+> packaging below are tested locally against fake release downloads; the
+> automated release-PR publication flow is still being delivered under #5, so
+> `install.sh` will fail until the first release exists. Until then, build from
+> source as shown above.
+
+### Installing a release
+
+`install.sh` installs the Linux amd64 or arm64 binary (`x86_64`/`aarch64` are
+normalised) from this repository's
+[GitHub Releases](https://github.com/jsburckhardt/pocketpull/releases):
+
+```sh
+curl -fsSL --proto '=https' -o install.sh \
+  https://raw.githubusercontent.com/jsburckhardt/pocketpull/main/install.sh
+less install.sh   # review before running
+bash install.sh                                  # latest into ~/.local/bin
+bash install.sh --version v1.2.3                 # exact release (1.2.3 also accepted)
+bash install.sh --install-dir "$HOME/my tools"   # custom destination
+```
+
+Interface: `install.sh [--version vX.Y.Z|X.Y.Z|latest] [--install-dir DIRECTORY]`,
+defaulting to `latest` and `~/.local/bin`; `--help` exits before any dependency,
+platform or network check. Prerelease and path-like versions are rejected.
+`latest` is resolved once to an exact `vX.Y.Z` tag; that release's archive and
+`checksums.txt` are then downloaded over HTTPS only (finite redirects, connect
+and total timeouts, HTTP errors fail). Requirements: Linux amd64/arm64, bash,
+curl, GNU tar, gzip, `sha256sum` and coreutils (`mktemp`, `stat`, `mv`, …). The
+installed binary needs no Go, Python or other application runtime.
+
+Before anything is executed or installed, the installer requires exactly one
+`checksums.txt` entry for the exact archive name, compares its SHA-256, and
+checks that the archive contains only one regular executable named
+`pocketpull` (no paths, links, directories or extra members). Download,
+verification and extraction happen in a private `$TMPDIR` directory removed on
+exit or interruption. The binary is staged in the destination directory and
+atomically renamed over `pocketpull`, so a failed download, checksum, archive or
+copy leaves an existing installation unchanged. It never uses sudo and never
+writes credentials, configuration, shell profiles or cron entries; if the
+destination is not on `PATH` it only prints a note, and an unwritable
+destination fails (choose another `--install-dir`).
+
+Checksum trust: `checksums.txt` is fetched from the same GitHub Release as the
+archive, so verification proves integrity relative to that repository release
+(corruption, truncation, mismatched asset). It does not independently prove
+publisher identity; there is no separate signing infrastructure. Trust rests on
+GitHub HTTPS and this repository's release permissions.
+
+### Versions
+
+Releases are tagged `vX.Y.Z` (no prereleases). Archive names and the reported
+version omit the `v`: `pocketpull --version` prints `pocketpull X.Y.Z` for
+release `vX.Y.Z`, while source builds report `pocketpull dev`. Include that
+output and your architecture (`uname -m`) when reporting problems.
+
+### Local packaging
+
+```sh
+just package-release v1.2.3 /path/to/new-output-dir
+```
+
+`scripts/package-release.sh VERSION OUTPUT_DIR` accepts `X.Y.Z` or `vX.Y.Z`
+(canonical SemVer core only), requires the pinned Go toolchain from `go.mod`
+(`GOTOOLCHAIN=local`), and builds CGO-free, statically linked Linux amd64 and
+arm64 binaries with the version injected into `internal/cli.version`. It writes
+`pocketpull_<version>_linux_amd64.tar.gz`,
+`pocketpull_<version>_linux_arm64.tar.gz` (each containing only `pocketpull`,
+mode 0755) and `checksums.txt` (`sha256sum` format over both archives). Output
+is staged beside `OUTPUT_DIR` and renamed into place only after every step
+succeeds; an existing `OUTPUT_DIR` is refused and never modified, and invalid
+versions or failed builds leave no output. Archive timestamps use
+`SOURCE_DATE_EPOCH` (default 0).
+
+### Checks and CI
+
+```sh
+just distribution-check
+```
+
+This syntax-checks both scripts, then packages two real versions in temporary
+directories and verifies archive contents, checksums, static ELF architecture
+and the native `--version`. It runs `install.sh` as a subprocess with fake
+`curl`/`uname` commands on `PATH` serving those real archives (no network): a
+latest and exact-version round trip with the real binary, upgrade, arm64
+selection, and failure preservation/cleanup for wrong, missing, duplicate,
+path-like or malformed checksum entries, missing downloads, non-gzip, extra,
+traversal, nested, symlink, hardlink, directory and non-executable members,
+unsupported OS/architecture, invalid versions, foreign/prerelease latest tags,
+interruption, paths with spaces, and no sudo/crontab use.
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pull requests
+targeting `main`, pushes to `main` and manual `workflow_dispatch`. On a
+non-root `ubuntu-24.04` runner it installs the same Go 1.27.4 and just 1.59.0
+releases (with the same SHA-256 digests) as the devcontainer, then runs
+`just distribution-check`, `just collector-check`, `just collector-smoke` and
+`just dev-check`. The token is read-only (`contents: read`), checkout does not
+persist credentials, there is no `pull_request_target` and no secrets or Pocket
+credentials, so fork pull requests receive no write token or release secrets.
+Actions are pinned to full commit SHAs. Newer runs of the same pull request
+cancel older ones; `main` runs are not cancelled.
+
+Local and CI checks are evidence about the code and fixtures only; they do not
+publish, tag or prove a GitHub Release. Conventional Commit versioning, the
+release PR, asset upload/retry and first-run repository permissions are
+documented with the release workflow when it lands.
+
 ## Development workspace
 
 Use Docker and the [Dev Container CLI](https://github.com/devcontainers/cli)
