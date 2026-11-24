@@ -51,8 +51,8 @@ Tracking issue: [#1](https://github.com/jsburckhardt/pocketpull/issues/1). This 
 - Collection leaves stdout free. No application log-file management, rotation service, or telemetry exporter is included.
 
 ## Constraints
-- Collector delivery remains alignment-only: no collector implementation or application dependency installation is authorised. Separate development-environment delivery is authorised only under #2.
-- The owner authorised committing AGENTS.md and both root briefs to main and pushing them. This replaces the earlier local-only record restriction, not the collector delivery gate.
+- The owner authorised resuming #1 with factory-slice followed by factory-deliver as Lead on 2026-11-23. The first slice must collect one recording end-to-end into the raw folder against an HTTP fixture. This supersedes the earlier collector delivery gate; implementation and necessary application dependencies within this agreement are authorised.
+- Deliver #1 on one integration branch and one independently accepted PR. The owner retains merge and release authority. Development-environment scope remains exclusively in the merged #2 delivery.
 - Use Go and prefer the simplest implementation satisfying these contracts. Cobra is a suitable delegated CLI choice; avoid Viper's implicit discovery/merging in favour of explicit strict YAML parsing. Exact supported pinned tool versions, package structure, minimal dependencies, request pacing/retries/timeouts, and detailed event formatting are delegated within the agreed boundaries.
 - Consequential changes to data completeness, credential handling, public contracts, dependency/cost/privacy boundaries, or scope require renewed alignment. No private inputs are sent to external research services.
 - Decisive delivery evidence may use fixtures derived from public documentation. No authenticated Pocket experiment is required or authorised here. An incompatible live API discovery reopens alignment instead of silently changing behaviour.
@@ -84,14 +84,96 @@ Tracking issue: [#1](https://github.com/jsburckhardt/pocketpull/issues/1). This 
 | D17 | Publish AGENTS.md, WORK_BRIEF.md for #1, and WORK_BRIEF_DEV_ENV.md for #2 to main with a signed commit and push. | Explicit owner instruction replaces the earlier local-only/uncommitted restriction; one brief per issue. | owner |
 | D18 | Keep collector #1 alignment-only; grant delivery go for #2 only. | The owner explicitly limited the superseding delivery authority to the development environment. | owner |
 | D19 | Move AC7, AC8, development contracts, and the development-auth/signing/telemetry portion of AC9 to #2. | Separate a useful development delivery from unapproved collector implementation; retain original AC IDs for traceability. | owner |
+| D22 | Resume collector #1; use factory-slice then factory-deliver as Lead, starting with one recording end-to-end into raw storage against an HTTP fixture. | Explicit owner go on 2026-11-23 supersedes D18 for #1; #2 remains separately delivered and merged. | owner |
 
 ## Open questions and spikes
 None. No spike is approved or required for the conservative agreed collection strategy. A live API incompatibility or another consequential collector contract change must reopen alignment.
 
 ## Tasks
-None. Owned by factory-slice after explicit delivery authorisation; this alignment does not create implementation tasks.
+Tasks are sequential because they extend the same CLI/collection contracts and shared files. Partial AC mappings below identify incremental evidence, not acceptance of the complete AC before its final owning task integrates. The Lead owns this brief and review records; implementers must not edit either brief or development-environment files.
+
+### T1 One recording reaches raw storage through a native CLI HTTP-fixture run
+- ACs: AC1, AC3, AC4, AC5, AC6, AC9 (thin-path evidence; remaining coverage in T2-T4)
+- Depends on: None
+- Contracts: Native run-once CLI; --help/--version; required --raw-dir and environment-only credential for this slice; documented Bearer list/detail routes; page traversal and ID deduplication; complete detail data preserving unknown fields; stable safe ID paths; atomic changed-only snapshots; no audio/pruning; baseline redacted slog stderr and summary. HTTP endpoint injection is internal/test-only, not an added public flag or environment contract.
+- Write scope: go.mod, go.sum, cmd/**, internal/**, justfile, AGENTS.md, README.md, .gitignore
+- Shared files: cmd/**, internal/**, go.mod, go.sum, justfile, AGENTS.md, README.md owned by T1 until integration, then transferred serially to its dependant
+- Resources: Loopback HTTP fixture on an OS-assigned port; temporary raw/test/build directories only
+- Checks: just collector-check; just collector-smoke; just dev-check
+- Status: integrated
+- Worker: factory/collector-t1; base 08773f6427fc2a5ace2d5b70888ed23f74193a96; accepted head 0cbe3da4421708372e41081a139cf85bcecb8aad; integrated as 8c30365da87c333b68aea753fe475533cbaab719; PID 887 exited; log .trees/collector-t1.log
+
+### T2 Config-driven and cron-safe collection with strict secret handling
+- ACs: AC2, AC6, AC9; AC1, AC4, AC5 regression
+- Depends on: T1
+- Contracts: Complete invocation/configuration/authentication contracts; single strict YAML file, exact discovery and CLI precedence, relative paths, no .env loading, owner-only secret files and conflicts; all collection flags; logging formats/severities and redaction even on malformed configuration; executable usage/cron/configuration examples. Preserve T1's fixture-to-raw path.
+- Write scope: go.mod, go.sum, cmd/**, internal/**, justfile, AGENTS.md, README.md, examples/**, .gitignore
+- Shared files: cmd/**, internal/**, go.mod, go.sum, justfile, AGENTS.md, README.md owned by T2 until integration, then transferred serially to its dependant
+- Resources: Loopback HTTP fixture on an OS-assigned port; temporary config/secret/raw directories only
+- Checks: just collector-check; just collector-smoke; just dev-check
+- Status: integrated
+- Worker: factory/collector-t2; base 7649fb6448124dd30171658ee6fe96c56e3ac7a0; accepted head 56c9f6890e57b1d7ebe6783a24d4e2e4c29cb507; integrated as af443b07838778b8c3c0eeee791de32d5540e025; PID 21922 exited; log .trees/collector-t2.log
+
+### T3 Thousand-record repeated collections refresh safely without overlap
+- ACs: AC3, AC4, AC5, AC9; AC2, AC6 regression
+- Depends on: T2
+- Contracts: Full 1,000-record multipage traversal and deduplication; new records immediate, existing/pending records refreshed by successful fetch time with injected clock; zero refresh; missing/unusable state or output refetch; canonical-raw-path state namespace outside raw; nonwaiting process-recoverable overlap lock; changed-only snapshots, missing/404 records never prune; document artifact layout and refresh latency.
+- Write scope: cmd/**, internal/**, justfile, AGENTS.md, README.md, examples/**
+- Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T3 until integration, then transferred serially to its dependant
+- Resources: Loopback HTTP fixtures on OS-assigned ports; independent temporary state/raw directories and subprocesses; no production archive
+- Checks: just collector-check; just collector-smoke; just dev-check
+- Status: integrated
+- Worker: factory/collector-t3 and factory/collector-t3-r1; task base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; accepted corrected head d302e094c26c14e13ca4472abf549d400610c504; integrated unchanged as c5e0ed2e86610890a91920422b1c59f58d5eb6d4 and d5e48dfbc41d6fd2cfe880a78ff05265dffc3f00; PIDs 27136/32602 exited; logs .trees/collector-t3.log and .trees/collector-t3-r1.log
+
+### T4 Interrupted and failing runs retain progress and report a complete operational outcome
+- ACs: AC1, AC2, AC3, AC4, AC5, AC6, AC9 (complete final coverage)
+- Depends on: T3
+- Contracts: Bounded transient network/429/server retries and timeouts; prompt auth stop; individual failures preserve partial progress and exit nonzero; malformed/failed-write cases preserve snapshots and never advance freshness; interruption/restart safety; pending is not an error; complete run/event/count logging, redacted at every severity, stdout free; final documentation covers all collector contracts and native amd64/arm64 builds.
+- Write scope: cmd/**, internal/**, justfile, AGENTS.md, README.md, examples/**
+- Shared files: cmd/**, internal/**, justfile, AGENTS.md, README.md owned by T4; Lead owns final evidence/publication in this brief and PR
+- Resources: Fault-injected loopback HTTP fixtures on OS-assigned ports; temporary state/raw/build directories and identified subprocesses only
+- Checks: just collector-check; just collector-smoke; just dev-check
+- Status: integrated
+- Worker: factory/collector-t4; base 31fea616b683b02a24e5f473fffb4d04aa4af78f; accepted head 959ee294abf8dc40895a66b3da1f3ca0c8dd95c1; integrated unchanged as 8d13fec8c82e8c65d7e45e450863d49995a2c043; PID 36732 exited; log .trees/collector-t4.log
 
 ## Status
-aligning
+review
 
-Shared understanding and collector AC1-AC6/AC9 are approved. Collector delivery is NOT authorised. The owner authorised publishing this agreement to main; only #2 has delivery go.
+Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and development AC9 remain exclusively in #2, merged by #3 at 548d269e38b3f332c8d4bbf2b4fc3870f8362630. Lead session: c5fac65e-0ea9-4288-aa93-7440ab7136d6. Integration branch: delivery/1-collector. T1-T4 are independently accepted and integrated; T3's sole major finding was corrected and freshly accepted before integration. Current combined checks pass. Final independent acceptance must cover the exact combined SHA before one PR targets main; its verdict and publication evidence belong in that PR without a post-review commit changing the accepted head. The owner merges/releases. Fixture delivery is not a live Pocket pilot or release.
+
+## Acceptance evidence
+### T1 independent task acceptance
+- Verdict: pass for T1-owned portions only; complete issue acceptance remains pending T2-T4.
+- Reviewer: fresh-context accept-collector-t1, factory-accept/factory-design; no repairs or builder self-certification.
+- Base: 08773f6427fc2a5ace2d5b70888ed23f74193a96. Reviewed head: 0cbe3da4421708372e41081a139cf85bcecb8aad. Integration: 8c30365da87c333b68aea753fe475533cbaab719.
+- AC1: both CGO-free target builds, native fixture subprocess and application help/version pass. AC3: multipage deduplication/immediate details pass; cache/1,000-record evidence deferred. AC4: lossless complete data, safe folders, changed-only atomic writes and failure preservation pass. AC5: partial progress/auth-stop/pending/cancellation cases pass; locks/retries deferred. AC6: redacted JSON stderr, empty stdout and summary pass; full formats/severities deferred. AC9: current behavior documented with explicit limitations; complete configuration/cache/retries deferred.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; go test -race -count=1 ./...; credential-free native help/version. All exit 0 in the non-root devcontainer. Findings: none.
+- Lead combined checks after exact serial cherry-pick: just collector-check; just collector-smoke; just dev-check. All exit 0. Signed worker commit verified; no surviving processes in PGID 887. T2 unlocked.
+
+### T2 independent task acceptance
+- Verdict: pass for complete AC2 and T2-owned AC6/AC9 plus accepted T1 regressions; state/cache/locking/retries remain deferred to T3/T4.
+- Reviewer: fresh-context accept-collector-t2, factory-accept/factory-design; no repairs or record edits.
+- Base: 7649fb6448124dd30171658ee6fe96c56e3ac7a0. Reviewed head: 56c9f6890e57b1d7ebe6783a24d4e2e4c29cb507. Integration: af443b07838778b8c3c0eeee791de32d5540e025.
+- AC2: single strict YAML discovery/precedence/path/type/default validation, help/version bypass, nonempty unique credential source and owner-only regular secret files pass. AC6: JSON/text/severity options and malicious-input/transport/content redaction pass. AC9: executable config/secret examples and accurate cron/limits documentation pass. AC1/AC4/AC5: native builds/smokes and snapshot/partial-progress regressions pass.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; go test -race -count=1 ./...; git diff --check. All exit 0 in non-root devcontainer; exact clean head verified. Findings: none.
+- Lead combined checks after exact serial cherry-pick: just collector-check; just collector-smoke; just dev-check. All exit 0. Signed worker head verified; no surviving processes in PGID 21922. T3 unlocked.
+
+### T3 initial independent task rejection
+- Verdict: fail. Reviewer: fresh-context accept-collector-t3, factory-accept/factory-design. Base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; reviewed head c00750a4ab07ca733372e6ffea0f3f79acc6a3d0. Not integrated; T4 remains blocked.
+- F1 (major, implementation): internal/collector/snapshot.go:31-36 and state.go:161,191 reuse the 32 MiB HTTP-response limit for indented raw snapshots. A valid 10,000,064-byte response writes a 35,000,057-byte snapshot; subsequent fresh and zero-refresh runs fail with prior snapshot unreadable. Raw readers must accommodate every accepted writer output, preserving semantic unchanged detection and prior-file safety.
+- AC3/AC4 fail due to F1. T3-owned AC5/AC9/AC2/AC6 pass: canonical namespaces, safe state, native overlap/alias/different-state/SIGKILL recovery and documentation/logging verified.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; git diff --check all exit 0; independent native loopback compact-response/expanded-output fixture reproduces F1. Exact worktree remained clean; scratch removed. Narrow correction requires regression, current checks and fresh acceptance of corrected exact head.
+
+### T3 corrected independent task acceptance
+- Verdict: pass; F1 resolved. Reviewer: fresh-context accept-collector-t3-f1, factory-accept/factory-design. Task base d2124a623fe49c1fe16a670ef407ef1d9e28dd9a; correction base c00750a4ab07ca733372e6ffea0f3f79acc6a3d0; reviewed corrected head d302e094c26c14e13ca4472abf549d400610c504.
+- AC3/AC4: 36,002,312-byte writer output now caches and supports forced/expired unchanged refresh with preserved inode/mtime, changed atomic replacement and exact large numbers; malformed/unusable raw safely refetches. Raw readers have no arbitrary transport cap; HTTP/private-state bounds are unchanged. No unresolved findings.
+- AC5/AC9/AC2/AC6: previous independent evidence remains valid; current combined regressions pass. Complete issue resilience remains T4-owned.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; focused expanded-snapshot/freshness/unusable-state race tests with -count=1; git diff --check. All exit 0 in non-root devcontainer; exact clean head verified.
+- Lead integrated both unchanged reviewed commits serially as c5e0ed2e86610890a91920422b1c59f58d5eb6d4 and d5e48dfbc41d6fd2cfe880a78ff05265dffc3f00, then just collector-check; just collector-smoke; just dev-check all exit 0. Worker signatures verified; no surviving correction PGID 32602. T4 unlocked.
+
+### T4 independent task acceptance
+- Verdict: pass. Reviewer: fresh-context accept-collector-t4, factory-accept/factory-design; no repairs, commits or record edits.
+- Base: 31fea616b683b02a24e5f473fffb4d04aa4af78f. Reviewed head: 959ee294abf8dc40895a66b3da1f3ca0c8dd95c1. Integration: 8d13fec8c82e8c65d7e45e450863d49995a2c043.
+- AC1: CGO-free Linux amd64/arm64 builds/native fixture smokes pass. AC2: strict config/authentication/redaction regressions unchanged and pass. AC3: thousand-record/freshness recovery and expanded snapshot pass. AC4: complete atomic changed-only data/failure preservation/no-pruning pass. AC5: four attempts, 500ms/1s/2s backoff, capped cancelable 10s Retry-After and 30s attempt/body timeouts; auth/permanent stops, partial progress, final-cache cancellation and native signal/lock/restart pass. AC6: truthful counts, redacted JSON/text/severity logs/run context/retry metadata and empty stdout pass. AC9: completed documentation accurately matches numeric bounds, count meanings, config/secrets/cron/artifacts/state/recovery.
+- Reviewer checks: just collector-check; just collector-smoke; just dev-check; go test -race -count=1 ./internal/cli ./internal/collector; git diff --check. All exit 0 non-root; exact clean scoped head verified. Findings: none.
+- Lead combined checks after exact serial cherry-pick: just collector-check; just collector-smoke; just dev-check all exit 0. Application/tests/docs tree equals accepted worker tree exactly (only Lead-owned WORK_BRIEF.md differs). Signed worker head verified; no surviving PGID 36732. All tasks complete; request independent final combined-SHA acceptance.
