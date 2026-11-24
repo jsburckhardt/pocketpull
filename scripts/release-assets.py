@@ -2,8 +2,14 @@
 """Validate a Release Please release and attach its verified Linux assets.
 
 Usage:
+  release-assets.py baseline --sha SHA
   release-assets.py resolve TAG [--sha SHA]
   release-assets.py publish TAG --sha SHA --assets DIR
+
+baseline succeeds when .release-please-manifest.json at SHA is past the 0.0.0
+bootstrap, or when the one-time v0.0.0 baseline tag (never a release) points to a
+commit on main, so Release Please derives the first version from history instead
+of proposing its fixed initial 1.0.0.
 
 resolve prints tag=, version= and sha= lines (GITHUB_OUTPUT format) only when TAG
 is a vX.Y.Z GitHub Release whose tag commit is on main, matches SHA if given, and
@@ -33,6 +39,8 @@ BRANCH = "main"
 TAG = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 SHA = re.compile(r"[0-9a-f]{40}")
 ARCHES = ("amd64", "arm64")
+BASELINE = "0.0.0"
+BASELINE_TAG = f"v{BASELINE}"
 
 
 class Failure(Exception):
@@ -57,16 +65,7 @@ def release_info(tag):
     return gh_json("release", "view", tag, "--json", "tagName,isDraft,isPrerelease,assets")
 
 
-def resolve(tag, expected_sha=None):
-    match = TAG.fullmatch(tag)
-    if not match:
-        raise Failure(f"tag must be vX.Y.Z without prerelease/build metadata: {tag!r}")
-    if expected_sha is not None and not SHA.fullmatch(expected_sha):
-        raise Failure(f"sha must be a full 40-character lowercase commit SHA: {expected_sha!r}")
-    version = tag[1:]
-    release = release_info(tag)
-    if release.get("tagName") != tag or release.get("isPrerelease"):
-        raise Failure(f"no stable GitHub Release exists for {tag}")
+def tag_commit(tag):
     obj = gh_json("api", f"repos/{{owner}}/{{repo}}/git/ref/tags/{tag}")["object"]
     for _ in range(5):
         if obj["type"] != "tag":
@@ -75,18 +74,64 @@ def resolve(tag, expected_sha=None):
     sha = obj["sha"]
     if obj["type"] != "commit" or not SHA.fullmatch(sha):
         raise Failure(f"{tag} does not point to a commit")
-    if expected_sha is not None and sha != expected_sha:
-        raise Failure(f"{tag} points to {sha}, not the expected release commit {expected_sha}")
+    return sha
+
+
+def require_on_main(tag, sha):
     status = gh_json("api", f"repos/{{owner}}/{{repo}}/compare/{sha}...{BRANCH}").get("status")
     if status not in ("ahead", "identical"):
         raise Failure(f"{tag} commit {sha} is not on {BRANCH} (compare status {status!r})")
+
+
+def manifest_version(sha):
     content = gh_json("api", f"repos/{{owner}}/{{repo}}/contents/.release-please-manifest.json?ref={sha}")
     try:
-        manifest = json.loads(base64.b64decode(content["content"]))
-    except (KeyError, ValueError) as err:
+        return json.loads(base64.b64decode(content["content"])).get(".")
+    except (KeyError, ValueError, AttributeError) as err:
         raise Failure(f"unreadable .release-please-manifest.json at {sha}: {err}") from None
-    if manifest.get(".") != version:
-        raise Failure(f"{sha} is not the Release Please commit for {version} (manifest {manifest!r})")
+
+
+def require_sha(sha):
+    if not SHA.fullmatch(sha):
+        raise Failure(f"sha must be a full 40-character lowercase commit SHA: {sha!r}")
+
+
+def baseline(sha):
+    require_sha(sha)
+    version = manifest_version(sha)
+    if version != BASELINE:
+        print(f"Manifest at {sha} records {version}; the v{BASELINE} baseline tag is no longer used")
+        return
+    try:
+        root = tag_commit(BASELINE_TAG)
+    except Failure as err:
+        raise Failure(
+            f"manifest is at the {BASELINE} bootstrap but the {BASELINE_TAG} baseline tag is "
+            f"unusable ({err}); without it Release Please ignores history and proposes 1.0.0. "
+            f"Create it once on the root commit (see README Releases) and rerun") from None
+    require_on_main(BASELINE_TAG, root)
+    print(f"Bootstrap baseline {BASELINE_TAG} at {root}; first version derives from later commits")
+
+
+def resolve(tag, expected_sha=None):
+    match = TAG.fullmatch(tag)
+    if not match:
+        raise Failure(f"tag must be vX.Y.Z without prerelease/build metadata: {tag!r}")
+    if tag == BASELINE_TAG:
+        raise Failure(f"{tag} is the bootstrap baseline tag, never a release")
+    if expected_sha is not None:
+        require_sha(expected_sha)
+    version = tag[1:]
+    release = release_info(tag)
+    if release.get("tagName") != tag or release.get("isPrerelease"):
+        raise Failure(f"no stable GitHub Release exists for {tag}")
+    sha = tag_commit(tag)
+    if expected_sha is not None and sha != expected_sha:
+        raise Failure(f"{tag} points to {sha}, not the expected release commit {expected_sha}")
+    require_on_main(tag, sha)
+    found = manifest_version(sha)
+    if found != version:
+        raise Failure(f"{sha} is not the Release Please commit for {version} (manifest records {found!r})")
     return version, sha
 
 
@@ -156,6 +201,7 @@ def publish(tag, sha, directory):
 def main(argv):
     parser = argparse.ArgumentParser(prog="release-assets.py", description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("baseline").add_argument("--sha", required=True)
     resolve_cmd = sub.add_parser("resolve")
     resolve_cmd.add_argument("tag")
     resolve_cmd.add_argument("--sha")
@@ -166,7 +212,9 @@ def main(argv):
     args = parser.parse_args(argv)
     if not os.environ.get("GH_REPO"):
         raise Failure("GH_REPO must name the repository (owner/name)")
-    if args.command == "resolve":
+    if args.command == "baseline":
+        baseline(args.sha)
+    elif args.command == "resolve":
         version, sha = resolve(args.tag, args.sha)
         sys.stdout.write(f"tag={args.tag}\nversion={version}\nsha={sha}\n")
     else:

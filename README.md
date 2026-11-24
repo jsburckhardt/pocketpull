@@ -424,19 +424,35 @@ Owner flow:
    draft (marked latest only if it is the highest stable version). Installers
    never see a release before all assets are attached.
 
-Bootstrap: the manifest starts at `0.0.1`, a one-time bookkeeping baseline
-meaning "nothing released" (no `v0.0.1` exists). Release Please treats `0.0.0`
-as "no previous version" and would propose a fixed initial version (1.0.0), so
-the baseline is the smallest version from which the collector history's
-`feat:` commits derive the first proposal (`0.1.0`; a breaking change would
-derive `1.0.0`). The first changelog's compare link to `v0.0.1` therefore does
-not resolve. After the first release the manifest is maintained only by
-Release Please PRs; there is no `release-as`/`initial-version` override.
+Bootstrap: the manifest starts at `0.0.0`, a one-time bookkeeping baseline
+meaning "nothing released". Release Please (17.6.0, and upstream `main`) uses a
+`0.0.0` manifest entry as the previous version only if a matching `v0.0.0`
+release or tag exists; otherwise it ignores the history and proposes its fixed
+initial version, 1.0.0. The baseline is therefore anchored once by a plain
+`v0.0.0` **tag** (never a GitHub Release, so installers never see it) on the
+repository's root commit, `083100f chore: vendor soft-factory-v2 skills…`. The
+owner creates it once, before the first release PR is wanted:
+
+```sh
+gh api repos/jsburckhardt/pocketpull/git/refs \
+  -f ref=refs/tags/v0.0.0 -f sha=083100ffc41442ef409761f8a41ddd669906e13d
+```
+
+Every later commit counts with normal SemVer from `0.0.0`. The collector
+history's `feat:` commits therefore derive a first proposal of `0.1.0`. A
+breaking change would derive `1.0.0`, and fixes alone `0.0.1`. The first
+changelog compares `v0.0.0...v0.1.0`. While the manifest is still `0.0.0`, the
+workflow's read-only `baseline` job (`scripts/release-assets.py baseline`) fails,
+naming the missing tag, if the tag is absent or not on `main`. In that case
+Release Please never runs, and no 1.0.0 PR can appear. After you create the tag,
+rerun that run or push to `main`. `resolve`/`publish` reject `v0.0.0`. After the
+first release, Release Please PRs alone maintain the manifest, and the baseline
+tag is no longer consulted. There is no `release-as`/`initial-version` override.
 
 First run (one-time, already set for this repository): Settings → Actions →
 General → Workflow permissions keeps the default **read** token and enables
 **Allow GitHub Actions to create and approve pull requests**, which Release
-Please needs to open its PR. Jobs request only what they use: CI and `build`
+Please needs to open its PR. Jobs request only what they use: CI, `baseline` and `build`
 read; `release-please` writes contents/issues/pull requests; `resolve` and
 `publish` write contents (drafts are visible only with push access) and run
 only the workflow's own `main` script, never code from the tag, before the

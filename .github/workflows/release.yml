@@ -21,7 +21,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # While the manifest is at the 0.0.0 bootstrap, Release Please derives the first
+  # version from history only above the one-time v0.0.0 baseline tag; without it it
+  # would propose a fixed 1.0.0, so refuse to open or update a release PR.
+  baseline:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 scripts/release-assets.py baseline --sha "$GITHUB_SHA"
+
   release-please:
+    needs: baseline
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 10

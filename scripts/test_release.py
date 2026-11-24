@@ -345,6 +345,50 @@ class ReleaseAssets(unittest.TestCase):
                 self.save()
         self.assertEqual(self.writes(), [])
 
+    def test_baseline_requires_v0_0_0_tag_on_main_while_manifest_is_0_0_0(self):
+        head, root = "d" * 40, "e" * 40
+        self.state["manifests"][head] = '{\n  ".": "0.0.0"\n}\n'
+        self.save()
+        missing = self.run_script("baseline", "--sha", head)
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn("v0.0.0", missing.stderr)
+        self.assertIn("1.0.0", missing.stderr)
+
+        self.state["tags"]["v0.0.0"] = {"type": "commit", "sha": root}
+        self.save()
+        off_main = self.run_script("baseline", "--sha", head)
+        self.assertNotEqual(off_main.returncode, 0)
+        self.assertIn("not on main", off_main.stderr)
+
+        self.state["compare"][root] = "ahead"
+        self.save()
+        ok = self.run_script("baseline", "--sha", head)
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        self.assertIn(root, ok.stdout)
+
+        # After the first release the manifest moves on and the baseline tag is irrelevant.
+        self.state["tags"].pop("v0.0.0")
+        self.save()
+        released = self.run_script("baseline", "--sha", SHA)
+        self.assertEqual(released.returncode, 0, released.stderr)
+        for args in (("--sha", "HEAD"), ("--sha", OTHER_SHA)):
+            with self.subTest(args=args):
+                self.assertNotEqual(self.run_script("baseline", *args).returncode, 0)
+        self.assertEqual(self.writes(), [])
+
+    def test_baseline_tag_is_never_treated_as_a_release(self):
+        self.state["releases"]["v0.0.0"] = {"draft": True, "assets": []}
+        self.state["tags"]["v0.0.0"] = {"type": "commit", "sha": SHA}
+        self.state["manifests"][SHA] = '{".": "0.0.0"}'
+        self.save()
+        for args in (("resolve", "v0.0.0"), ("publish", "v0.0.0", "--sha", SHA, "--assets",
+                                                 str(self.assets))):
+            with self.subTest(command=args[0]):
+                result = self.run_script(*args)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("baseline", result.stderr)
+        self.assertEqual(self.writes(), [])
+
     def test_publish_revalidates_tag_before_writing(self):
         self.state["tags"]["v0.1.0"] = {"type": "commit", "sha": OTHER_SHA}
         self.state["compare"][OTHER_SHA] = "ahead"

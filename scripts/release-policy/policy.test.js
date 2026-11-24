@@ -104,27 +104,48 @@ test('config uses only known keys and pins normal SemVer below 1.0', () => {
   }
 });
 
-test('first proposal is derived from collector history, not a fixed version', async () => {
+// The repository's root commit carries the one-time v0.0.0 baseline tag (not a release).
+const ROOT_SHA = '083100ffc41442ef409761f8a41ddd669906e13d';
+const BASELINE_TAG = {name: 'v0.0.0', sha: ROOT_SHA};
+
+// Newest first; ends at the root commit, as on main.
+function fromBaseline(messages, tags = [BASELINE_TAG]) {
+  const history = messages.map(commit);
+  history.push({sha: ROOT_SHA, message: COLLECTOR_HISTORY.at(-1), files: ['.github/skills/x']});
+  return {tags, commits: history};
+}
+
+test('first proposal is derived from collector history above the 0.0.0 baseline', async () => {
   const bootstrap = JSON.parse(committed(MANIFEST))['.'];
-  assert.equal(bootstrap, '0.0.1', 'manifest holds only the bootstrap baseline until the first release');
-  const pr = await proposed({commits: COLLECTOR_HISTORY.map(commit)});
+  assert.equal(bootstrap, '0.0.0', 'manifest holds only the bootstrap baseline until the first release');
+  const pr = await proposed(fromBaseline(COLLECTOR_HISTORY.slice(0, -1)));
   assert.equal(pr.version.toString(), '0.1.0');
   assert.equal(pr.title.toString(), 'chore(main): release 0.1.0');
   assert.equal(pr.headRefName, 'release-please--branches--main');
   const notes = pr.body.toString();
+  assert.match(notes, /compare\/v0\.0\.0\.\.\.v0\.1\.0/);
   assert.match(notes, /### Features/);
   assert.match(notes, /collect Pocket recording snapshots through native CLI/);
   assert.match(notes, /### Bug Fixes/);
   assert.doesNotMatch(notes, /vendor soft-factory|Implement T2|non-root workspace/);
 
-  const fixesOnly = await proposed({commits: ['fix: one', 'docs: two'].map(commit)});
-  assert.equal(fixesOnly.version.toString(), '0.0.2');
-  const breaking = await proposed({commits: ['feat!: incompatible', ...COLLECTOR_HISTORY].map(commit)});
+  const fixesOnly = await proposed(fromBaseline(['fix: one', 'docs: two']));
+  assert.equal(fixesOnly.version.toString(), '0.0.1');
+  const breaking = await proposed(fromBaseline(['feat!: incompatible', ...COLLECTOR_HISTORY.slice(0, -1)]));
   assert.equal(breaking.version.toString(), '1.0.0');
+  assert.equal(await proposed(fromBaseline(['docs: only', 'chore: tidy'])), undefined);
+});
 
-  // Why the baseline is not 0.0.0: release-please then ignores the commits.
-  const zero = await proposed({manifest: '{".": "0.0.0"}', commits: ['fix: one'].map(commit)});
-  assert.equal(zero.version.toString(), '1.0.0');
+test('without the v0.0.0 baseline tag release-please ignores history, so the workflow must refuse', async () => {
+  // release-please skips a 0.0.0 manifest entry unless a v0.0.0 tag/release exists and then
+  // proposes its fixed initial version; release.yml's baseline job fails closed instead.
+  for (const messages of [['fix: one'], COLLECTOR_HISTORY.slice(0, -1)]) {
+    const pr = await proposed(fromBaseline(messages, []));
+    assert.equal(pr.version.toString(), '1.0.0');
+  }
+  const workflow = committed('.github/workflows/release.yml');
+  assert.match(workflow, /release-assets\.py baseline --sha "\$GITHUB_SHA"/);
+  assert.match(workflow, /release-please:\n(?:    .*\n)*?    needs: baseline\n/);
 });
 
 test('fix, feat and breaking changes bump patch, minor and major before and after 1.0', async () => {
