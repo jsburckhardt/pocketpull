@@ -18,7 +18,7 @@ from test_distribution import FAKE_CURL, HOST_ARCH, INSTALL, PACKAGE, REPO  # no
 PUBLISH = Path(__file__).resolve().parent / "release-assets.py"
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
-NAMES = ["pocketpull_0.1.0_linux_amd64.tar.gz", "pocketpull_0.1.0_linux_arm64.tar.gz",
+NAMES = ["pocketpull_1.0.0_linux_amd64.tar.gz", "pocketpull_1.0.0_linux_arm64.tar.gz",
          "checksums.txt"]
 
 # Models the GitHub REST responses and gh release subcommands the script uses.
@@ -120,11 +120,13 @@ class ReleaseAssets(unittest.TestCase):
     def setUpClass(cls):
         cls.shared = Path(tempfile.mkdtemp(prefix="pocketpull-release-test."))
         cls.assets = cls.shared / "assets"
-        result = subprocess.run(["bash", str(PACKAGE), "v0.1.0", str(cls.assets)],
-                                capture_output=True, text=True)
-        if result.returncode:
-            shutil.rmtree(cls.shared)
-            raise AssertionError(f"packaging failed:\n{result.stdout}{result.stderr}")
+        cls.previous_assets = cls.shared / "previous-assets"
+        for version, assets in (("v1.0.0", cls.assets), ("v0.1.0", cls.previous_assets)):
+            result = subprocess.run(["bash", str(PACKAGE), version, str(assets)],
+                                    capture_output=True, text=True)
+            if result.returncode:
+                shutil.rmtree(cls.shared)
+                raise AssertionError(f"packaging failed:\n{result.stdout}{result.stderr}")
 
     @classmethod
     def tearDownClass(cls):
@@ -145,11 +147,11 @@ class ReleaseAssets(unittest.TestCase):
         self.tmp = self.work / "tmp dir"
         self.tmp.mkdir()
         self.state = {
-            "releases": {"v0.1.0": {"draft": True, "assets": []}},
-            "tags": {"v0.1.0": {"type": "commit", "sha": SHA}},
+            "releases": {"v1.0.0": {"draft": True, "assets": []}},
+            "tags": {"v1.0.0": {"type": "commit", "sha": SHA}},
             "annotated": {},
             "compare": {SHA: "ahead"},
-            "manifests": {SHA: '{\n  ".": "0.1.0"\n}\n'},
+            "manifests": {SHA: '{\n  ".": "1.0.0"\n}\n'},
         }
         self.save()
         self.env = {
@@ -171,7 +173,7 @@ class ReleaseAssets(unittest.TestCase):
         return subprocess.run([sys.executable, str(PUBLISH), *args], env={**self.env, **env},
                               capture_output=True, text=True, timeout=60)
 
-    def publish(self, assets=None, tag="v0.1.0", sha=SHA, **env):
+    def publish(self, assets=None, tag="v1.0.0", sha=SHA, **env):
         return self.run_script("publish", tag, "--sha", sha, "--assets", str(assets or self.assets),
                                **env)
 
@@ -183,12 +185,12 @@ class ReleaseAssets(unittest.TestCase):
     def writes(self):
         return [c for c in self.gh_calls() if c[:1] == ["release"] and c[1] in WRITES]
 
-    def seed(self, tag, names, data=None):
+    def seed(self, tag, names, data=None, assets=None):
         (self.store / tag).mkdir(exist_ok=True)
         for name in names:
             target = self.store / tag / name
             if data is None:
-                shutil.copyfile(self.assets / name, target)
+                shutil.copyfile((assets or self.assets) / name, target)
             else:
                 target.write_bytes(data)
         self.state["releases"][tag]["assets"] = list(names)
@@ -201,11 +203,11 @@ class ReleaseAssets(unittest.TestCase):
         self.assertIsNotNone(HOST_ARCH, "round trip needs a Linux amd64/arm64 host")
         result = self.publish()
         self.assertEqual(result.returncode, 0, result.stderr)
-        release = self.load()["releases"]["v0.1.0"]
+        release = self.load()["releases"]["v1.0.0"]
         self.assertEqual(sorted(release["assets"]), sorted(NAMES))
         self.assertEqual((release["draft"], release["latest"]), (False, True))
         for name in NAMES:
-            self.assertEqual((self.store / "v0.1.0" / name).read_bytes(),
+            self.assertEqual((self.store / "v1.0.0" / name).read_bytes(),
                              (self.assets / name).read_bytes())
         self.assert_clean()
 
@@ -220,11 +222,11 @@ class ReleaseAssets(unittest.TestCase):
         installed = subprocess.run(
             ["bash", str(INSTALL)], capture_output=True, text=True, timeout=60,
             env={**self.env, "HOME": str(home), "FAKE_RELEASES": str(releases),
-                 "FAKE_LATEST": "v0.1.0", "FAKE_CURL_LOG": str(self.work / "curl.log")})
+                 "FAKE_LATEST": "v1.0.0", "FAKE_CURL_LOG": str(self.work / "curl.log")})
         self.assertEqual(installed.returncode, 0, installed.stderr)
         version = subprocess.run([str(home / ".local/bin/pocketpull"), "--version"],
                                  capture_output=True, text=True)
-        self.assertEqual(version.stdout, "pocketpull 0.1.0\n")
+        self.assertEqual(version.stdout, "pocketpull 1.0.0\n")
 
         # Rerunning against the complete published release changes nothing.
         before = len(self.writes())
@@ -234,45 +236,65 @@ class ReleaseAssets(unittest.TestCase):
         self.assertEqual(len(self.writes()), before)
 
     def test_recovery_uploads_only_missing_assets_then_publishes(self):
-        self.seed("v0.1.0", [NAMES[0]])
+        self.seed("v1.0.0", [NAMES[0]])
         result = self.publish()
         self.assertEqual(result.returncode, 0, result.stderr)
         uploads = [c for c in self.writes() if c[1] == "upload"]
         self.assertEqual(len(uploads), 1)
         self.assertEqual(sorted(Path(f).name for f in uploads[0][3:]), sorted(NAMES[1:]))
-        release = self.load()["releases"]["v0.1.0"]
+        release = self.load()["releases"]["v1.0.0"]
         self.assertFalse(release["draft"])
         self.assertEqual(sorted(release["assets"]), sorted(NAMES))
+        self.assert_clean()
+
+    def test_existing_published_pre_major_release_can_recover_missing_assets(self):
+        tag = "v0.1.0"
+        names = [name.replace("1.0.0", "0.1.0") for name in NAMES]
+        self.state["releases"][tag] = {"draft": False, "assets": []}
+        self.state["tags"][tag] = {"type": "commit", "sha": OTHER_SHA}
+        self.state["compare"][OTHER_SHA] = "ahead"
+        self.state["manifests"][OTHER_SHA] = '{".": "0.1.0"}'
+        self.seed(tag, [names[0]], assets=self.previous_assets)
+
+        result = self.publish(self.previous_assets, tag, OTHER_SHA)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Completed assets of published release", result.stdout)
+        release = self.load()["releases"][tag]
+        self.assertFalse(release["draft"])
+        self.assertEqual(sorted(release["assets"]), sorted(names))
+        writes = self.writes()
+        self.assertEqual([call[1] for call in writes], ["upload"])
+        self.assertEqual(sorted(Path(f).name for f in writes[0][3:]), sorted(names[1:]))
         self.assert_clean()
 
     def test_failed_upload_leaves_draft_and_retry_completes(self):
         failed = self.publish(FAKE_GH_UPLOAD_FAIL="1")
         self.assertNotEqual(failed.returncode, 0)
         self.assertIn("upload failed", failed.stderr)
-        self.assertTrue(self.load()["releases"]["v0.1.0"]["draft"])
+        self.assertTrue(self.load()["releases"]["v1.0.0"]["draft"])
         self.assertFalse([c for c in self.writes() if c[1] == "edit"])
         self.assert_clean()
         retried = self.publish()
         self.assertEqual(retried.returncode, 0, retried.stderr)
-        self.assertFalse(self.load()["releases"]["v0.1.0"]["draft"])
+        self.assertFalse(self.load()["releases"]["v1.0.0"]["draft"])
 
     def test_existing_different_asset_is_never_replaced(self):
-        self.seed("v0.1.0", [NAMES[1]], data=b"other bytes")
+        self.seed("v1.0.0", [NAMES[1]], data=b"other bytes")
         result = self.publish()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(NAMES[1], result.stderr)
         self.assertIn("differs", result.stderr)
         self.assertEqual(self.writes(), [])
-        self.assertEqual((self.store / "v0.1.0" / NAMES[1]).read_bytes(), b"other bytes")
-        self.assertTrue(self.load()["releases"]["v0.1.0"]["draft"])
+        self.assertEqual((self.store / "v1.0.0" / NAMES[1]).read_bytes(), b"other bytes")
+        self.assertTrue(self.load()["releases"]["v1.0.0"]["draft"])
         self.assert_clean()
 
     def test_older_release_is_published_without_becoming_latest(self):
-        self.state["releases"]["v0.2.0"] = {"draft": False, "assets": []}
+        self.state["releases"]["v1.1.0"] = {"draft": False, "assets": []}
         self.save()
         result = self.publish()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.load()["releases"]["v0.1.0"]["latest"], False)
+        self.assertEqual(self.load()["releases"]["v1.0.0"]["latest"], False)
 
     def test_incomplete_or_mismatched_asset_directory_is_rejected_before_writes(self):
         def variant(label, mutate):
@@ -287,7 +309,7 @@ class ReleaseAssets(unittest.TestCase):
             "corrupt archive": lambda d: (d / NAMES[0]).write_bytes(b"corrupt"),
             "foreign checksum entry": lambda d: (d / "checksums.txt").write_text(
                 (d / "checksums.txt").read_text() + f"{'0' * 64}  other.tar.gz\n"),
-            "wrong version": lambda d: [p.rename(d / p.name.replace("0.1.0", "0.2.0"))
+            "wrong version": lambda d: [p.rename(d / p.name.replace("1.0.0", "1.1.0"))
                                         for p in list(d.iterdir()) if p.name.endswith(".tar.gz")],
         }
         for label, mutate in cases.items():
@@ -297,27 +319,27 @@ class ReleaseAssets(unittest.TestCase):
                 self.assertTrue(result.stderr.startswith("release-assets.py: "), result.stderr)
                 self.assertEqual(self.writes(), [])
                 self.assert_clean()
-        self.assertTrue(self.load()["releases"]["v0.1.0"]["draft"])
+        self.assertTrue(self.load()["releases"]["v1.0.0"]["draft"])
 
     def test_resolve_accepts_only_reviewed_release_tags_on_main(self):
-        ok = self.run_script("resolve", "v0.1.0")
+        ok = self.run_script("resolve", "v1.0.0")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertEqual(ok.stdout, f"tag=v0.1.0\nversion=0.1.0\nsha={SHA}\n")
-        self.assertEqual(self.run_script("resolve", "v0.1.0", "--sha", SHA).stdout, ok.stdout)
+        self.assertEqual(ok.stdout, f"tag=v1.0.0\nversion=1.0.0\nsha={SHA}\n")
+        self.assertEqual(self.run_script("resolve", "v1.0.0", "--sha", SHA).stdout, ok.stdout)
 
-        self.state["tags"]["v0.1.0"] = {"type": "tag", "sha": "c" * 40}
+        self.state["tags"]["v1.0.0"] = {"type": "tag", "sha": "c" * 40}
         self.state["annotated"]["c" * 40] = {"type": "commit", "sha": SHA}
         self.save()
-        self.assertEqual(self.run_script("resolve", "v0.1.0").stdout, ok.stdout)
+        self.assertEqual(self.run_script("resolve", "v1.0.0").stdout, ok.stdout)
 
         rejected = {
-            "short tag": ("v0.1",),
-            "missing v": ("0.1.0",),
-            "prerelease": ("v0.1.0-rc.1",),
+            "short tag": ("v1.0",),
+            "missing v": ("1.0.0",),
+            "prerelease": ("v1.0.0-rc.1",),
             "branch": ("main",),
-            "shell": ("v0.1.0;id",),
-            "bad sha": ("v0.1.0", "--sha", "HEAD"),
-            "other sha": ("v0.1.0", "--sha", OTHER_SHA),
+            "shell": ("v1.0.0;id",),
+            "bad sha": ("v1.0.0", "--sha", "HEAD"),
+            "other sha": ("v1.0.0", "--sha", OTHER_SHA),
             "no release": ("v9.9.9",),
         }
         for label, args in rejected.items():
@@ -330,6 +352,7 @@ class ReleaseAssets(unittest.TestCase):
         for label, change in (
             ("off main", lambda s: s["compare"].update({SHA: "diverged"})),
             ("manifest mismatch", lambda s: s["manifests"].update({SHA: '{".": "0.0.9"}'})),
+            ("unreleased manifest", lambda s: s["manifests"].update({SHA: '{}'})),
             ("no manifest", lambda s: s["manifests"].clear()),
             ("no tag", lambda s: s["tags"].clear()),
         ):
@@ -338,45 +361,14 @@ class ReleaseAssets(unittest.TestCase):
                 saved = json.loads(json.dumps(self.state))
                 change(self.state)
                 self.save()
-                result = self.run_script("resolve", "v0.1.0")
+                result = self.run_script("resolve", "v1.0.0")
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(result.stdout, "")
                 self.state = saved
                 self.save()
         self.assertEqual(self.writes(), [])
 
-    def test_baseline_requires_v0_0_0_tag_on_main_while_manifest_is_0_0_0(self):
-        head, root = "d" * 40, "e" * 40
-        self.state["manifests"][head] = '{\n  ".": "0.0.0"\n}\n'
-        self.save()
-        missing = self.run_script("baseline", "--sha", head)
-        self.assertNotEqual(missing.returncode, 0)
-        self.assertIn("v0.0.0", missing.stderr)
-        self.assertIn("1.0.0", missing.stderr)
-
-        self.state["tags"]["v0.0.0"] = {"type": "commit", "sha": root}
-        self.save()
-        off_main = self.run_script("baseline", "--sha", head)
-        self.assertNotEqual(off_main.returncode, 0)
-        self.assertIn("not on main", off_main.stderr)
-
-        self.state["compare"][root] = "ahead"
-        self.save()
-        ok = self.run_script("baseline", "--sha", head)
-        self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn(root, ok.stdout)
-
-        # After the first release the manifest moves on and the baseline tag is irrelevant.
-        self.state["tags"].pop("v0.0.0")
-        self.save()
-        released = self.run_script("baseline", "--sha", SHA)
-        self.assertEqual(released.returncode, 0, released.stderr)
-        for args in (("--sha", "HEAD"), ("--sha", OTHER_SHA)):
-            with self.subTest(args=args):
-                self.assertNotEqual(self.run_script("baseline", *args).returncode, 0)
-        self.assertEqual(self.writes(), [])
-
-    def test_baseline_tag_is_never_treated_as_a_release(self):
+    def test_unreleased_legacy_manifest_does_not_authorize_recovery(self):
         self.state["releases"]["v0.0.0"] = {"draft": True, "assets": []}
         self.state["tags"]["v0.0.0"] = {"type": "commit", "sha": SHA}
         self.state["manifests"][SHA] = '{".": "0.0.0"}'
@@ -386,11 +378,11 @@ class ReleaseAssets(unittest.TestCase):
             with self.subTest(command=args[0]):
                 result = self.run_script(*args)
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn("baseline", result.stderr)
+                self.assertIn("unreleased", result.stderr)
         self.assertEqual(self.writes(), [])
 
     def test_publish_revalidates_tag_before_writing(self):
-        self.state["tags"]["v0.1.0"] = {"type": "commit", "sha": OTHER_SHA}
+        self.state["tags"]["v1.0.0"] = {"type": "commit", "sha": OTHER_SHA}
         self.state["compare"][OTHER_SHA] = "ahead"
         self.save()
         result = self.publish()

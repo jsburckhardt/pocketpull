@@ -104,48 +104,78 @@ test('config uses only known keys and pins normal SemVer below 1.0', () => {
   }
 });
 
-// The repository's root commit carries the one-time v0.0.0 baseline tag (not a release).
 const ROOT_SHA = '083100ffc41442ef409761f8a41ddd669906e13d';
-const BASELINE_TAG = {name: 'v0.0.0', sha: ROOT_SHA};
 
 // Newest first; ends at the root commit, as on main.
-function fromBaseline(messages, tags = [BASELINE_TAG]) {
+function fromInitialHistory(messages) {
   const history = messages.map(commit);
   history.push({sha: ROOT_SHA, message: COLLECTOR_HISTORY.at(-1), files: ['.github/skills/x']});
-  return {tags, commits: history};
+  return {manifest: '{}', commits: history};
 }
 
-test('first proposal is derived from collector history above the 0.0.0 baseline', async () => {
-  const bootstrap = JSON.parse(committed(MANIFEST))['.'];
-  assert.equal(bootstrap, '0.0.0', 'manifest holds only the bootstrap baseline until the first release');
-  const pr = await proposed(fromBaseline(COLLECTOR_HISTORY.slice(0, -1)));
-  assert.equal(pr.version.toString(), '0.1.0');
-  assert.equal(pr.title.toString(), 'chore(main): release 0.1.0');
-  assert.equal(pr.headRefName, 'release-please--branches--main');
-  const notes = pr.body.toString();
-  assert.match(notes, /compare\/v0\.0\.0\.\.\.v0\.1\.0/);
-  assert.match(notes, /### Features/);
-  assert.match(notes, /collect Pocket recording snapshots through native CLI/);
-  assert.match(notes, /### Bug Fixes/);
-  assert.doesNotMatch(notes, /vendor soft-factory|Implement T2|non-root workspace/);
-
-  const fixesOnly = await proposed(fromBaseline(['fix: one', 'docs: two']));
-  assert.equal(fixesOnly.version.toString(), '0.0.1');
-  const breaking = await proposed(fromBaseline(['feat!: incompatible', ...COLLECTOR_HISTORY.slice(0, -1)]));
-  assert.equal(breaking.version.toString(), '1.0.0');
-  assert.equal(await proposed(fromBaseline(['docs: only', 'chore: tidy'])), undefined);
+test('the committed manifest drives the initial or current release policy', async () => {
+  const contents = committed(MANIFEST);
+  const versions = JSON.parse(contents);
+  const current = versions['.'];
+  let fixture;
+  let expected;
+  if (current === undefined) {
+    assert.deepEqual(versions, {});
+    fixture = fromInitialHistory(COLLECTOR_HISTORY.slice(0, -1));
+    expected = '1.0.0';
+  } else {
+    assert.deepEqual(Object.keys(versions), ['.']);
+    assert.match(current, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
+    assert.notEqual(current, '0.0.0');
+    const [major, minor, patch] = current.split('.').map(Number);
+    fixture = afterRelease(current, ['fix: retry']);
+    expected = `${major}.${minor}.${patch + 1}`;
+  }
+  fixture.manifest = contents;
+  const pr = await proposed(fixture);
+  assert.ok(pr);
+  assert.equal(pr.version.toString(), expected);
 });
 
-test('without the v0.0.0 baseline tag release-please ignores history, so the workflow must refuse', async () => {
-  // release-please skips a 0.0.0 manifest entry unless a v0.0.0 tag/release exists and then
-  // proposes its fixed initial version; release.yml's baseline job fails closed instead.
-  for (const messages of [['fix: one'], COLLECTOR_HISTORY.slice(0, -1)]) {
-    const pr = await proposed(fromBaseline(messages, []));
-    assert.equal(pr.version.toString(), '1.0.0');
+test('no tags or releases: collector feature history proposes the automatic first 1.0.0', async () => {
+  const initial = fromInitialHistory(COLLECTOR_HISTORY.slice(0, -1));
+  const pr = await proposed(initial);
+  assert.ok(pr);
+  assert.equal(pr.version.toString(), '1.0.0');
+  assert.equal(pr.title.toString(), 'chore(main): release 1.0.0');
+  assert.equal(pr.headRefName, 'release-please--branches--main');
+  const manifestUpdate = pr.updates.find(update => update.path === MANIFEST);
+  assert.ok(manifestUpdate);
+  assert.deepEqual(JSON.parse(manifestUpdate.updater.updateContent(initial.manifest)), {'.': '1.0.0'});
+  const changelogUpdate = pr.updates.find(update => update.path === 'CHANGELOG.md');
+  assert.ok(changelogUpdate);
+  for (const notes of [pr.body.toString(), changelogUpdate.updater.updateContent('')]) {
+    assert.doesNotMatch(notes, /compare\/v0\.0\.0/);
+    assert.match(notes, /### Features/);
+    assert.match(notes, /collect Pocket recording snapshots through native CLI/);
+    assert.match(notes, /### Bug Fixes/);
+    assert.doesNotMatch(notes, /vendor soft-factory|Implement T2|non-root workspace/);
   }
+
+  const fixesOnly = await proposed(fromInitialHistory(['fix: one', 'docs: two']));
+  assert.equal(fixesOnly.version.toString(), '1.0.0');
+  const breaking = await proposed(fromInitialHistory(['feat!: incompatible', ...COLLECTOR_HISTORY.slice(0, -1)]));
+  assert.equal(breaking.version.toString(), '1.0.0');
+  assert.equal(await proposed(fromInitialHistory(['docs: only', 'chore: tidy'])), undefined);
+});
+
+test('an unrelated old tag alone cannot select the first release version', async () => {
+  const fixture = fromInitialHistory(COLLECTOR_HISTORY.slice(0, -1));
+  fixture.tags = [{name: 'v0.0.0', sha: ROOT_SHA}];
+  const pr = await proposed(fixture);
+  assert.equal(pr.version.toString(), '1.0.0');
+});
+
+test('the first release PR is not gated on a manual baseline tag', () => {
   const workflow = committed('.github/workflows/release.yml');
-  assert.match(workflow, /release-assets\.py baseline --sha "\$GITHUB_SHA"/);
-  assert.match(workflow, /release-please:\n(?:    .*\n)*?    needs: baseline\n/);
+  assert.doesNotMatch(workflow, /^  baseline:/m);
+  assert.doesNotMatch(workflow, /release-assets\.py baseline\b/);
+  assert.doesNotMatch(workflow, /^\s+needs:\s*baseline\s*$/m);
 });
 
 test('fix, feat and breaking changes bump patch, minor and major before and after 1.0', async () => {
@@ -167,31 +197,39 @@ test('fix, feat and breaking changes bump patch, minor and major before and afte
 });
 
 test('docs, chore, test, ci and build changes alone propose no release', async () => {
-  const pr = await proposed(afterRelease('0.1.0', [
-    'docs: explain install', 'chore: tidy', 'test: more cases', 'ci: tweak', 'build: pin', 'style: fmt',
-    'refactor: simplify',
-  ]));
-  assert.equal(pr, undefined);
+  for (const version of ['0.1.0', '1.0.0']) {
+    const pr = await proposed(afterRelease(version, [
+      'docs: explain install', 'chore: tidy', 'test: more cases', 'ci: tweak', 'build: pin', 'style: fmt',
+      'refactor: simplify',
+    ]));
+    assert.equal(pr, undefined);
+  }
 });
 
-test('merging the release PR yields a draft v-tag release with forced tag at the merge commit', async () => {
-  const pr = await proposed(afterRelease('0.1.0', ['feat: new flag']));
+test('merging the first or a later release PR yields a draft forced tag at the merge commit', async () => {
+  const initial = fromInitialHistory(COLLECTOR_HISTORY.slice(0, -1));
+  const cases = [
+    {propose: initial, merged: {...initial, manifest: JSON.stringify({'.': '1.0.0'})}, tag: 'v1.0.0'},
+    {propose: afterRelease('0.1.0', ['feat: new flag']), merged: afterRelease('0.1.0', []), tag: 'v0.2.0'},
+  ];
   const mergeSha = 'f'.repeat(40);
-  const fixture = afterRelease('0.1.0', []);
-  fixture.pullRequests = [{
-    merged: true, number: 7, sha: mergeSha, title: pr.title.toString(), body: pr.body.toString(),
-    labels: pr.labels, headBranchName: pr.headRefName, baseBranchName: 'main', files: [],
-  }];
-  const manifest = await Manifest.fromManifest(fakeGitHub(fixture), 'main', CONFIG, MANIFEST);
-  const releases = await manifest.buildReleases();
-  assert.equal(releases.length, 1);
-  const [release] = releases;
-  assert.equal(release.tag.toString(), 'v0.2.0');
-  assert.equal(release.sha, mergeSha);
-  assert.equal(release.draft, true);
-  assert.equal(release.forceTag, true);
-  assert.ok(!release.prerelease);
-  assert.equal(release.path, '.');
+  for (const {propose: history, merged: fixture, tag} of cases) {
+    const pr = await proposed(history);
+    fixture.pullRequests = [{
+      merged: true, number: 7, sha: mergeSha, title: pr.title.toString(), body: pr.body.toString(),
+      labels: pr.labels, headBranchName: pr.headRefName, baseBranchName: 'main', files: [],
+    }];
+    const manifest = await Manifest.fromManifest(fakeGitHub(fixture), 'main', CONFIG, MANIFEST);
+    const releases = await manifest.buildReleases();
+    assert.equal(releases.length, 1);
+    const [release] = releases;
+    assert.equal(release.tag.toString(), tag);
+    assert.equal(release.sha, mergeSha);
+    assert.equal(release.draft, true);
+    assert.equal(release.forceTag, true);
+    assert.ok(!release.prerelease);
+    assert.equal(release.path, '.');
+  }
 });
 
 test('a draft release with its forced tag is found as the previous release', async () => {

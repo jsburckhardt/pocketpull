@@ -357,11 +357,13 @@ just workflow-lint          # pinned actionlint v1.7.12; uses shellcheck if on P
 
 `release-policy-check` installs the locked tooling in `scripts/release-policy`
 (`npm ci`, release-please 17.6.0, the version bundled by the pinned action) and
-runs the committed Release Please config and manifest through the real
-library against an in-memory GitHub: the first proposal from collector-style
-history, fix/feat/breaking bumps before and after 1.0, no release for
+runs the committed Release Please config and current manifest, plus history
+fixtures, through the real library against an in-memory GitHub. It covers the
+automatic initial 1.0.0 proposal from collector-style history without tags,
+fix/feat/breaking bumps before and after 1.0, no release for
 docs/chore/test/ci/build-only changes, and the draft `vX.Y.Z` release with a
-forced tag at the release PR merge commit.
+forced tag at the release PR merge commit. The initial-history fixture remains
+empty after the real manifest advances.
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pull requests
 targeting `main`, pushes to `main` and manual `workflow_dispatch`. On a
@@ -388,12 +390,19 @@ Versions and the changelog come from
 [`.release-please-manifest.json`](.release-please-manifest.json)). Nobody
 chooses or edits version numbers.
 
+With no previous release, the manifest starts empty and Release Please proposes
+its automatic initial version, **1.0.0**, when it finds releasable commits. The
+collector's features and fixes appear in the first changelog. Non-release changes
+alone do not create a release. No manual seed or tag is used, and no `release-as`
+or `initial-version` override is set. The release PR records the version in the
+manifest; subsequent versions follow these rules:
+
 | Change on `main` | Next version |
 |---|---|
 | `fix: …` | patch (`0.1.0` → `0.1.1`) |
 | `feat: …` | minor (`0.1.0` → `0.2.0`) |
 | `feat!: …`, `fix!: …` or a `BREAKING CHANGE:` footer | major, also before 1.0 (`0.1.0` → `1.0.0`) |
-| only `docs`, `chore`, `test`, `ci`, `build`, `style`, `refactor` | no release |
+| only non-breaking `docs`, `chore`, `test`, `ci`, `build`, `style`, `refactor` | no release |
 
 `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` are `false`, so
 breaking changes are never downgraded below 1.0. Contributors: the commit that
@@ -424,36 +433,11 @@ Owner flow:
    draft (marked latest only if it is the highest stable version). Installers
    never see a release before all assets are attached.
 
-Bootstrap: the manifest starts at `0.0.0`, a one-time bookkeeping baseline
-meaning "nothing released". Release Please (17.6.0, and upstream `main`) uses a
-`0.0.0` manifest entry as the previous version only if a matching `v0.0.0`
-release or tag exists; otherwise it ignores the history and proposes its fixed
-initial version, 1.0.0. The baseline is therefore anchored once by a plain
-`v0.0.0` **tag** (never a GitHub Release, so installers never see it) on the
-repository's root commit, `083100f chore: vendor soft-factory-v2 skills…`. The
-owner creates it once, before the first release PR is wanted:
-
-```sh
-gh api repos/jsburckhardt/pocketpull/git/refs \
-  -f ref=refs/tags/v0.0.0 -f sha=083100ffc41442ef409761f8a41ddd669906e13d
-```
-
-Every later commit counts with normal SemVer from `0.0.0`. The collector
-history's `feat:` commits therefore derive a first proposal of `0.1.0`. A
-breaking change would derive `1.0.0`, and fixes alone `0.0.1`. The first
-changelog compares `v0.0.0...v0.1.0`. While the manifest is still `0.0.0`, the
-workflow's read-only `baseline` job (`scripts/release-assets.py baseline`) fails,
-naming the missing tag, if the tag is absent or not on `main`. In that case
-Release Please never runs, and no 1.0.0 PR can appear. After you create the tag,
-rerun that run or push to `main`. `resolve`/`publish` reject `v0.0.0`. After the
-first release, Release Please PRs alone maintain the manifest, and the baseline
-tag is no longer consulted. There is no `release-as`/`initial-version` override.
-
-First run (one-time, already set for this repository): Settings → Actions →
-General → Workflow permissions keeps the default **read** token and enables
-**Allow GitHub Actions to create and approve pull requests**, which Release
-Please needs to open its PR. Jobs request only what they use: CI, `baseline` and `build`
-read; `release-please` writes contents/issues/pull requests; `resolve` and
+Before the first run, ensure Settings → Actions → General → Workflow permissions
+keeps the default **read** token and enables **Allow GitHub Actions to create
+and approve pull requests**, which Release Please needs to open its PR. Jobs
+request only what they use: CI and `build` read; `release-please` writes
+contents/issues/pull requests; `resolve` and
 `publish` write contents (drafts are visible only with push access) and run
 only the workflow's own `main` script, never code from the tag, before the
 read-only build. Release operations share one non-cancelling concurrency group.
