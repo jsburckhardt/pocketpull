@@ -67,8 +67,8 @@ None. GitHub documents GITHUB_TOKEN-generated PR workflows may require approval,
 - Shared files: scripts/**, justfile, AGENTS.md, README.md owned by T2; Lead owns briefs/final evidence/publication
 - Resources: Temporary packaging/install/version-policy fixtures; GitHub PR CI only after reviewed publication; no real release/tag/merge
 - Checks: just distribution-check; just collector-check; just collector-smoke; just dev-check
-- Status: blocked
-- Worker: factory/release-t2; base b446965ac3770ce4948259a9f46eaf2f10ce71d2; unintegrated head f538f9e06f4c0092584576b1272ca44c1fd9800c (contains unapproved manual bootstrap tag requirement); PID 16719 exited. Narrow correction for approved D7 pending; log .trees/release-t2.log
+- Status: in-progress
+- Worker: factory/release-t2; base b446965ac3770ce4948259a9f46eaf2f10ce71d2; unintegrated head f538f9e06f4c0092584576b1272ca44c1fd9800c (manual bootstrap requirement superseded by D7); PID 16719 exited. Correction factory/release-t2-r1 from that head; head pending; PID 47818 in devcontainer 43753475d620; log .trees/release-t2-r1.log
 
 ## Status
 delivering
