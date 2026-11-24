@@ -55,8 +55,8 @@ None. GitHub documents GITHUB_TOKEN-generated PR workflows may require approval,
 - Shared files: scripts/**, justfile, AGENTS.md, README.md owned by T1 until integration then T2; Lead owns all work briefs
 - Resources: Temporary output/install/fixture directories; loopback ports only if needed; no public release, real credentials or cron
 - Checks: just distribution-check; just collector-check; just collector-smoke; just dev-check
-- Status: ready
-- Worker: None
+- Status: in-progress
+- Worker: factory/release-t1; base dd5ec0af28011ad14b0df1e6bc9847a4077875d4; head pending; PID 324 in devcontainer 43753475d620; log .trees/release-t1.log
 
 ### T2 Conventional Commits produce an owner-merged release PR and tested installable assets
 - ACs: AC1, AC2, AC3, AC4, AC5, AC6, AC7
