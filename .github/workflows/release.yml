@@ -1,0 +1,102 @@
+name: Release
+
+# Pushes to main let Release Please create/update the release PR. Only merging that
+# PR makes Release Please create the draft release and tag; this same run then checks
+# and packages the exact tagged commit and publishes the release once every asset is
+# attached. workflow_dispatch retries assets for an existing Release Please release.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing Release Please release tag (vX.Y.Z) whose assets are missing
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Runs only this workflow's own main-branch script (never tag code) with a write
+  # token, because draft releases are visible only with push access.
+  resolve:
+    needs: release-please
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'push' && needs.release-please.result == 'success' &&
+        needs.release-please.outputs.release_created == 'true') ||
+       github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+          SHA: ${{ needs.release-please.outputs.sha }}
+        run: python3 scripts/release-assets.py resolve "$TAG" ${SHA:+--sha "$SHA"} >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    if: always() && needs.resolve.result == 'success'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.resolve.outputs.sha }}
+      release-version: ${{ needs.resolve.outputs.version }}
+
+  publish:
+    needs: [resolve, build]
+    if: always() && needs.resolve.result == 'success' && needs.build.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets-${{ needs.resolve.outputs.version }}
+          path: ${{ runner.temp }}/release-assets
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          SHA: ${{ needs.resolve.outputs.sha }}
+        run: python3 scripts/release-assets.py publish "$TAG" --sha "$SHA" --assets "$RUNNER_TEMP/release-assets"

@@ -36,12 +36,22 @@ collector-check:
 collector-smoke:
     go test ./internal/cli -run '^TestNativeSmoke$' -count=1
 
-# Distribution: real two-arch packaging plus fake-download installer integration tests.
+# Distribution: real two-arch packaging, fake-download installer and fake-gh release publication tests.
 distribution-check:
     bash -n install.sh
     bash -n scripts/package-release.sh
     python3 scripts/test_distribution.py
+    python3 scripts/test_release.py
 
 # Distribution: build release archives/checksums for VERSION into a new OUTPUT_DIR.
 package-release version output_dir:
     bash scripts/package-release.sh {{quote(version)}} {{quote(output_dir)}}
+
+# Release policy (needs Node >= 24, npm): real release-please against the committed config.
+release-policy-check:
+    npm ci --prefix scripts/release-policy --ignore-scripts --no-audit --no-fund
+    node --test scripts/release-policy/policy.test.js
+
+# Workflows: pinned actionlint (Go module download/cache) over .github/workflows.
+workflow-lint:
+    GOFLAGS= go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12

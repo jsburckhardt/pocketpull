@@ -1,0 +1,12 @@
+{
+  "name": "pocketpull-release-policy",
+  "private": true,
+  "description": "Tooling only: checks the Release Please configuration with the same release-please version bundled by the pinned action.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "release-please": "17.6.0"
+  }
+}

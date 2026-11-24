@@ -343,8 +343,9 @@ class Distribution(unittest.TestCase):
         old = dest / "pocketpull"
         old.write_text("old binary")
         started = self.work / "started"
+        # An exact version skips latest resolution, so the hang is the archive download.
         process = subprocess.Popen(
-            ["bash", str(INSTALL), "--install-dir", str(dest)],
+            ["bash", str(INSTALL), "--version", "0.2.0", "--install-dir", str(dest)],
             env={**self.env, "FAKE_CURL_HANG": str(started)},
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
         )
@@ -353,6 +354,9 @@ class Distribution(unittest.TestCase):
             while not started.exists():
                 self.assertLess(time.monotonic(), deadline, "fake download never started")
                 time.sleep(0.05)
+            self.assertEqual([p.name.startswith("pocketpull-install.") for p in self.tmp.iterdir()],
+                             [True], "download scratch directory should exist before interruption")
+            self.assertTrue(self.curl_calls()[-1][-1].endswith(f"_linux_{HOST_ARCH}.tar.gz"))
             os.killpg(process.pid, signal.SIGTERM)
             self.assertNotEqual(process.wait(timeout=20), 0)
         finally:
