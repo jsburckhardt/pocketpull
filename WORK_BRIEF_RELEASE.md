@@ -66,8 +66,8 @@ None. GitHub documents GITHUB_TOKEN-generated PR workflows may require approval,
 - Shared files: scripts/**, justfile, AGENTS.md, README.md owned by T2; Lead owns briefs/final evidence/publication
 - Resources: Temporary packaging/install/version-policy fixtures; GitHub PR CI only after reviewed publication; no real release/tag/merge
 - Checks: just distribution-check; just collector-check; just collector-smoke; just dev-check
-- Status: ready
-- Worker: None
+- Status: in-progress
+- Worker: factory/release-t2; base b446965ac3770ce4948259a9f46eaf2f10ce71d2; head pending; PID 16719 in devcontainer 43753475d620; log .trees/release-t2.log
 
 ## Status
 delivering
