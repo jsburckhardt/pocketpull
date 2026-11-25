@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Release builds (release.yml) run these same checks on the exact release commit,
+  # then package the archives as a workflow artifact. No write token is granted.
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact commit SHA to check out and check
+        type: string
+        default: ''
+      release-version:
+        description: X.Y.Z to package and upload as an artifact after the checks pass
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ inputs.ref || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Confirm exact release commit
+        if: inputs.ref != ''
+        env:
+          REF: ${{ inputs.ref }}
+        run: test "$(git rev-parse HEAD)" = "$REF"
+
+      # Same Go/just releases and digests as .devcontainer/install-tools.sh (amd64).
+      # Node runs only the release-policy tooling (scripts/release-policy).
+      - name: Install pinned Go, just and Node
+        run: |
+          tools="$RUNNER_TEMP/tools"
+          mkdir -p "$tools/bin"
+          curl -fsSL --proto '=https' --retry 3 --connect-timeout 15 --max-time 300 \
+            https://go.dev/dl/go1.27.4.linux-amd64.tar.gz -o "$RUNNER_TEMP/go.tar.gz"
+          echo "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840  $RUNNER_TEMP/go.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/go.tar.gz" -C "$tools"
+          curl -fsSL --proto '=https' --retry 3 --connect-timeout 15 --max-time 300 \
+            https://github.com/casey/just/releases/download/1.59.0/just-1.59.0-x86_64-unknown-linux-musl.tar.gz \
+            -o "$RUNNER_TEMP/just.tar.gz"
+          echo "409044617b6f06517c1035e55ca38c8c856ff8b650e41bc2aa1ef82d5903a23e  $RUNNER_TEMP/just.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/just.tar.gz" -C "$tools/bin" just
+          curl -fsSL --proto '=https' --retry 3 --connect-timeout 15 --max-time 300 \
+            https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-x64.tar.xz -o "$RUNNER_TEMP/node.tar.xz"
+          echo "4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb  $RUNNER_TEMP/node.tar.xz" | sha256sum --check
+          mkdir "$tools/node"
+          tar -xJf "$RUNNER_TEMP/node.tar.xz" -C "$tools/node" --strip-components=1
+          printf '%s\n' "$tools/go/bin" "$tools/bin" "$tools/node/bin" >> "$GITHUB_PATH"
+
+      - name: Confirm non-root runner and toolchain
+        run: |
+          test "$(id -u)" -ne 0
+          go version
+          just --version
+          node --version
+
+      - name: Distribution check
+        run: just distribution-check
+      - name: Collector check
+        run: just collector-check
+      - name: Collector smoke
+        run: just collector-smoke
+      - name: Workspace check
+        run: just dev-check
+      - name: Release policy check
+        run: just release-policy-check
+      - name: Workflow lint
+        run: just workflow-lint
+
+      - name: Package release assets
+        if: inputs.release-version != ''
+        env:
+          VERSION: ${{ inputs.release-version }}
+        run: |
+          out="$RUNNER_TEMP/release-assets"
+          just package-release "$VERSION" "$out"
+          tar -xzf "$out/pocketpull_${VERSION}_linux_amd64.tar.gz" -C "$RUNNER_TEMP" pocketpull
+          test "$("$RUNNER_TEMP/pocketpull" --version)" = "pocketpull $VERSION"
+          (cd "$out" && sha256sum --check --strict checksums.txt)
+
+      - name: Upload release assets artifact
+        if: inputs.release-version != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets-${{ inputs.release-version }}
+          path: ${{ runner.temp }}/release-assets
+          if-no-files-found: error
+          retention-days: 14
