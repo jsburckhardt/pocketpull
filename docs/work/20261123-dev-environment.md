@@ -3,7 +3,7 @@
 ## Goal
 Provide a consistent, project-scoped development and agent devcontainer for Pocketpull, including Go, Herdr, SSH commit signing, and optional metadata-only Copilot observability through an external OTLP collector.
 
-Tracking issue: [#2](https://github.com/jsburckhardt/pocketpull/issues/2). This file is the canonical development-environment agreement. Split from [#1](https://github.com/jsburckhardt/pocketpull/issues/1); [WORK_BRIEF.md](WORK_BRIEF.md) exclusively owns collector scope. Original AC IDs are retained for traceability.
+Tracking issue: [#2](https://github.com/jsburckhardt/pocketpull/issues/2). This file is the canonical development-environment agreement. Split from [#1](https://github.com/jsburckhardt/pocketpull/issues/1); [20261123-collector.md](20261123-collector.md) exclusively owns collector scope. Original AC IDs are retained for traceability.
 
 ## Acceptance criteria
 - AC7: The devcontainer builds and runs as non-root with Go, Git/GitHub CLI, Copilot CLI, pinned Herdr, just, and zsh; SSH commit signing works through the approved read-only SSH-directory mount. It has no host Docker socket or production-data mount, and does not auto-start Herdr. | evidence: devcontainer build/tool smoke checks, mount/user inspection, and signing verification with a disposable test key rather than production credentials.
@@ -88,7 +88,9 @@ None. Owner resolved the pseudonymous-field boundary in D21. No spike, CLI versi
 - Worker: correction branch factory/dev-env-t2-r1; base 6c956ca8782335c911fa43956d5150625e95ab62; accepted head 011992788a514be2cb33091fb8136450c04d175e; worker PID 3583019 exited with no surviving group processes; log .trees/dev-env-t2-r1.log. Lead exclusively repaired implementation F2 after independent failure at c63a313, without amending commits. Independent acceptance passed revised AC8, AC9 and preserved AC7 with no unresolved findings; integrated unchanged by signed merge.
 
 ## Status
-pr-open
+done
+
+Merged to main by [PR #3](https://github.com/jsburckhardt/pocketpull/pull/3). The notes below are the status recorded during delivery.
 
 Both tasks are independently accepted and integrated unchanged. T1 passed at da30c5322a2b56b6931838bc063482531ecd8968; T2 passed at 011992788a514be2cb33091fb8136450c04d175e after owner D21 resolved F1 and the Lead repaired F2 with persistent regressions. Independent final acceptance passed e6cc0ccd06c57644262f9a3d11ec460127cd290a against main fc531fe320fe7dac4cfc02a9814e146a90a4d49f with no unresolved findings. [PR #3](https://github.com/jsburckhardt/pocketpull/pull/3) is open targeting main. This publication-status update changes no implementation. Collector #1 remains alignment-only. Merge and release remain owner-controlled.
 

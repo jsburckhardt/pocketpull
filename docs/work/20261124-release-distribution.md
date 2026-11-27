@@ -3,7 +3,7 @@
 ## Goal
 Make the completed collector continuously checked and installable from versioned Linux releases. Derive versions/changelogs from Conventional Commits; the owner releases by merging an automatically maintained Release Please PR rather than selecting version numbers.
 
-Tracking issue: [#5](https://github.com/jsburckhardt/pocketpull/issues/5). Collector agreement remains in WORK_BRIEF.md; development scope remains in WORK_BRIEF_DEV_ENV.md.
+Tracking issue: [#5](https://github.com/jsburckhardt/pocketpull/issues/5). Collector agreement remains in [20261123-collector.md](20261123-collector.md); development scope remains in [20261123-dev-environment.md](20261123-dev-environment.md).
 
 ## Acceptance criteria
 - AC1: main is the repository default, master is preserved, and collector #1 is closed with evidence from merged #4. | evidence: repository/issue API reads and ancestry check.
@@ -71,7 +71,9 @@ None. GitHub documents GITHUB_TOKEN-generated PR workflows may require approval,
 - Worker: factory/release-t2 and factory/release-t2-r1; task base b446965ac3770ce4948259a9f46eaf2f10ce71d2; accepted corrected head 0426086a150bc8b386febb04f4a37e702fcaf923; integrated unchanged through 72c47386971573e11a8d642a558a09366076fbb1, 0485a89fa2a3d91520770c1c6eae7198684ec8c7 and fb58b7313f61a8b7cb97917c3262ded88b793581; PIDs 16719/47818 exited; logs .trees/release-t2.log and .trees/release-t2-r1.log
 
 ## Status
-delivering
+done
+
+Merged to main by [PR #6](https://github.com/jsburckhardt/pocketpull/pull/6). The notes below are the status recorded during delivery.
 
 Owner scope and go agreed. main default and collector #1 closure verified; master preserved. Base afed54e4b03d139d13d5b989ab04dadcf9c46925. Lead branch delivery/5-release-distribution. Follow independent review and serial integration; one final PR, no merge/release. Record final verdict/publication in the existing issue/PR to preserve exact reviewed SHA.
 
