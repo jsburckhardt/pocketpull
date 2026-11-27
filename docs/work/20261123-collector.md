@@ -3,7 +3,7 @@
 ## Goal
 Provide a single Go binary that performs one config-driven collection of Pocket transcripts and wiki-useful API content into a configurable raw folder, suitable for invocation by cron.
 
-Tracking issue: [#1](https://github.com/jsburckhardt/pocketpull/issues/1). This file is the canonical collector agreement. Development-environment ACs and contracts are owned exclusively by [#2](https://github.com/jsburckhardt/pocketpull/issues/2) in [WORK_BRIEF_DEV_ENV.md](WORK_BRIEF_DEV_ENV.md).
+Tracking issue: [#1](https://github.com/jsburckhardt/pocketpull/issues/1). This file is the canonical collector agreement. Development-environment ACs and contracts are owned exclusively by [#2](https://github.com/jsburckhardt/pocketpull/issues/2) in [20261123-dev-environment.md](20261123-dev-environment.md).
 
 ## Acceptance criteria
 - AC1: Linux amd64 and arm64 binaries build without requiring an installed application runtime; a native smoke run collects once and exits, with no scheduler. | evidence: both target builds and a native CLI smoke test against an HTTP fixture.
@@ -137,7 +137,9 @@ Tasks are sequential because they extend the same CLI/collection contracts and s
 - Worker: factory/collector-t4; base 31fea616b683b02a24e5f473fffb4d04aa4af78f; accepted head 959ee294abf8dc40895a66b3da1f3ca0c8dd95c1; integrated unchanged as 8d13fec8c82e8c65d7e45e450863d49995a2c043; PID 36732 exited; log .trees/collector-t4.log
 
 ## Status
-review
+done
+
+Merged to main by [PR #4](https://github.com/jsburckhardt/pocketpull/pull/4). The notes below are the status recorded during delivery.
 
 Collector AC1-AC6/AC9 and delivery are authorised. Development AC7/AC8 and development AC9 remain exclusively in #2, merged by #3 at 548d269e38b3f332c8d4bbf2b4fc3870f8362630. Lead session: c5fac65e-0ea9-4288-aa93-7440ab7136d6. Integration branch: delivery/1-collector. T1-T4 are independently accepted and integrated; T3's sole major finding was corrected and freshly accepted before integration. Current combined checks pass. Final independent acceptance must cover the exact combined SHA before one PR targets main; its verdict and publication evidence belong in that PR without a post-review commit changing the accepted head. The owner merges/releases. Fixture delivery is not a live Pocket pilot or release.
 
