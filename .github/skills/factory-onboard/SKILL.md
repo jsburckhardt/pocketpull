@@ -1,6 +1,6 @@
 ---
 name: factory-onboard
-description: "Discover a new or existing repository and add the Soft Factory v2 delivery section to AGENTS.md without rewriting the application."
+description: "Onboard a new, existing or already-onboarded repository to Soft Factory v3: docs structure, AGENTS.md section and vendored skills."
 metadata:
   author: "Soft Factory maintainers"
   spec_version: "1.0"
@@ -8,30 +8,41 @@ metadata:
 
 # Factory onboard
 
-Understand a new or existing repository before delivery and route every session to
-the v2 flow through `AGENTS.md`. Do not turn onboarding into scaffolding, environment
-configuration or an application rewrite. For an empty repository, do only step 5.
+Make a repository ready for v3 delivery without rewriting the application. The
+foreman chooses the mode; do not ask the owner which mode applies.
 
-1. Read repository instructions, source/tests, relevant architecture, git state and CI.
-   Discover actual commands and existing `just` recipes; do not invent capabilities.
-2. Check repository-local commit identity/signing. Preserve dirty work and existing
-   conventions. Work in the existing devcontainer without repeated container setup.
-3. Identify real focused/full checks, image builds and relevant integration/UI evidence.
-   Suggest missing checks; do not install tools, edit the devcontainer or generate
-   placeholder checks unless explicitly requested.
-4. Record local-versus-deployed limitations, access prerequisites and merge/release
-   authority in the existing project/work record. Keep secrets out of tracked files.
-5. Add or update the delivery section in root `AGENTS.md` using
-   [format-agents-delivery-section](assets/formats/format-agents-delivery-section-v1.0.0.example.md).
-   Fill `## Commands` only with commands verified in step 3. Preserve all other content.
-6. Return a concise repository understanding and genuine blockers. Do not create a
-   new documentation hierarchy or replace v1 instructions.
+| Mode | Detected when | Do |
+|---|---|---|
+| new | no application code, no v3 `AGENTS.md` section | steps 1, 3, 4, 5 |
+| existing | code exists, no v3 `AGENTS.md` section | steps 1-5 |
+| update | v3 section exists, vendored version older than source | steps 1, 5 |
+
+1. Vendoring: copy the source plugin's `skills/*` to `.github/skills/` and
+   `agents/*` to `.github/agents/`, replacing previous `factory-*` and
+   `foreman.agent.md` copies only. Record the source repo and commit in the
+   `AGENTS.md` section. Tell the owner to reload skills/agents in open sessions.
+2. Discover: read instructions, source, tests, CI, `just` recipes, git default
+   branch, commit identity/signing and the devcontainer. Record only commands that
+   actually run. Report a second default branch or second runtime as a finding.
+   Do not install tools, edit the devcontainer or generate placeholder checks.
+3. Docs: create only the missing directories and `index.md` files of
+   [format-docs-tree](assets/formats/format-docs-tree-v1.0.0.example.md). In
+   existing mode, propose a move plan for misplaced docs (README sections, root
+   briefs) as a direct-tier task; do not move content during onboarding.
+4. Add or update the `AGENTS.md` section using
+   [format-agents-section](assets/formats/format-agents-section-v1.0.0.example.md),
+   between its markers, preserving all other content. Add
+   `docs/architecture/decisions.md merge=union` to `.gitattributes`.
+5. Commit onboarding changes before any delivery; worktrees only see commits.
+   Return repository understanding, findings and the next foreman step.
 
 ## References
 
-Continue with `factory-align` for a delivery request.
+1. [format-docs-tree](assets/formats/format-docs-tree-v1.0.0.example.md)
+2. [format-agents-section](assets/formats/format-agents-section-v1.0.0.example.md)
 
 ## Skill layout
 
 - `SKILL.md`: instructions.
-- `assets/formats/format-agents-delivery-section-v1.0.0.example.md`: AGENTS_DELIVERY_SECTION_V1 contract.
+- `assets/formats/format-docs-tree-v1.0.0.example.md`: DOCS_TREE_V1 contract.
+- `assets/formats/format-agents-section-v1.0.0.example.md`: AGENTS_SECTION_V1 contract.

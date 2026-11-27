@@ -1,6 +1,7 @@
 <format id="IMPLEMENTER_RESULT_V1" name="Implementer Result" purpose="Evidence an implementer returns to the lead; input to task review, not acceptance.">
 - Report only commands actually run and their actual results.
 - Every task AC MUST appear in the AC evidence table.
+- Posted by the lead as a PR comment; never committed.
 
 ```markdown
 # Result <TASK_ID>
@@ -24,6 +25,12 @@
 |---|---|---|
 | <AC_ID> | <AC_EVIDENCE> | <AC_STATUS> |
 
+## Docs updated
+<DOCS_UPDATED>
+
+## Guesses
+<GUESSES>
+
 ## Escalations
 <ESCALATIONS>
 ```
@@ -35,6 +42,8 @@ WHERE:
 - <BRANCH> is String.
 - <COMMAND> is String.
 - <COMMAND_RESULT> is String; exit code and short summary.
+- <DOCS_UPDATED> is String; ADR/component/docs paths changed, or `None`.
+- <GUESSES> is Markdown; what you had to guess or work out by hand that a command, recipe or doc could have told you, or `None`.
 - <ESCALATIONS> is Markdown; unresolved decisions or scope changes, or `None`.
 - <FILES> is String; changed paths, comma-separated.
 - <HEAD_SHA> is String; committed head.

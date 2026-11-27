@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Usage: worker.sh start <task-id> <base-ref> <prompt-file>
 #        worker.sh stop <task-id>
+#        worker.sh clean <task-id>
 # start: create .trees/<task-id> on branch factory/<task-id> and run one
 #        copilot --yolo -p implementer in its own process group.
 # stop:  terminate that worker's whole process group; keeps the worktree.
+# clean: after integration, remove the worktree, merged branch, pid and prompt;
+#        keeps the log until the PR merges. Refuses dirty trees and unmerged branches.
 set -euo pipefail
 
-usage() { echo "usage: $0 start <task-id> <base-ref> <prompt-file> | stop <task-id>" >&2; exit 2; }
+usage() { echo "usage: $0 start <task-id> <base-ref> <prompt-file> | stop <task-id> | clean <task-id>" >&2; exit 2; }
 [ $# -ge 2 ] || usage
 cmd=$1 task=$2
 root=$(git rev-parse --show-toplevel)
@@ -37,6 +40,18 @@ stop)
   for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 -- "-$pgid" 2>/dev/null || break; sleep 1; done
   kill -0 -- "-$pgid" 2>/dev/null && kill -KILL -- "-$pgid"
   echo "stopped $task (pgid $pgid); worktree kept"
+  ;;
+clean)
+  running && { echo "worker $task still running; stop it first" >&2; exit 1; }
+  if [ -e "$tree" ]; then
+    [ -z "$(git -C "$tree" status --porcelain)" ] || { echo "$tree has uncommitted work" >&2; exit 1; }
+    git worktree remove "$tree"
+  fi
+  if git show-ref -q --verify "refs/heads/factory/$task"; then
+    git branch -d "factory/$task" >/dev/null || { echo "factory/$task not merged into HEAD; integrate first" >&2; exit 1; }
+  fi
+  rm -f "$pidfile" ".trees/$task.prompt.md"
+  echo "cleaned $task; kept $log"
   ;;
 *) usage ;;
 esac

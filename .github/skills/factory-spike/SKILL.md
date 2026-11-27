@@ -11,7 +11,7 @@ metadata:
 Resolve a consequential unknown through an explicitly approved, bounded experiment.
 Routine code/documentation lookup is research, not a spike.
 
-1. Request approval through `ask_user`: question/decision, known facts, recommended
+1. Request approval through `ask_user` (ESCALATION_V1 from `factory-align`): question/decision, known facts, recommended
    method, scope/exclusions, time/effort bound, access/cost constraints and observable
    exit conditions. Wait for approval before experimental work.
 2. Work within the agreed bounds and existing environment. Keep experimental code
@@ -19,7 +19,7 @@ Routine code/documentation lookup is research, not a spike.
    limitations without exposing secrets or private data.
 3. At the bound, stop and report unanswered questions. Any extension needs approval;
    do not silently expand the experiment or promote it to production.
-4. Write `docs/spikes/<date>-<slug>.md` using
+4. Write `docs/spikes/YYYYMMDD-<slug>.md` using
    [format-spike-report](assets/formats/format-spike-report-v1.0.0.example.md).
 5. A useful non-viability result can be success. Return consequential findings to
    alignment; the spike's recommendation is not automatically an approved decision.

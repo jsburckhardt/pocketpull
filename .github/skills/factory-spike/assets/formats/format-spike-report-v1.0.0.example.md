@@ -39,7 +39,7 @@ WHERE:
 - <ARTIFACTS> is Markdown; experimental code paths and disposition (`delete`, `keep-as-reference`).
 - <BOUND> is String; time or effort limit.
 - <CONS> is String.
-- <DATE> is ISO8601; date only.
+- <DATE> is String; `YYYYMMDD`.
 - <DECISION> is String.
 - <EVIDENCE> is Markdown; actual probes, sources and negative results.
 - <EXIT_CONDITIONS> is String; observable conditions agreed before starting.

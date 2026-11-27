@@ -1,5 +1,5 @@
 <format id="ACCEPTANCE_VERDICT_V1" name="Acceptance Verdict" purpose="Independent review decision for an exact task, repair or final SHA.">
-- Post in the existing review or work record, or return as the requested handoff.
+- Post as a PR comment or return as the requested handoff; never commit it.
 - Every relevant AC MUST appear; missing access or owner evaluation is `blocked`.
 - `pass` requires no unresolved `blocker` or `major` finding.
 
@@ -25,6 +25,9 @@
 | # | Severity | Location | Finding | Suggested fix | Owner |
 |---|---|---|---|---|---|
 | F<N> | <SEVERITY> | <LOCATION> | <FINDING> | <FIX> | <OWNER> |
+
+## Guesses
+<GUESSES>
 ```
 WHERE:
 - <AC_DECISION> is String; one of `pass`, `fail`, `blocked`.
@@ -35,6 +38,7 @@ WHERE:
 - <COMMAND_RESULT> is String; exit code and short summary.
 - <FINDING> is String.
 - <FIX> is String.
+- <GUESSES> is Markdown; what you had to guess or work out by hand that a command, recipe or doc could have told you, or `None`.
 - <HEAD_SHA> is String; exact SHA reviewed.
 - <KIND> is String; one of `task`, `repair`, `final`.
 - <LOCATION> is String; path and line.

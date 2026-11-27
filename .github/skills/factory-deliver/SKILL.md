@@ -1,6 +1,6 @@
 ---
 name: factory-deliver
-description: "Resume an agreed delivery, run TDD workers in .trees, independently review, serially integrate and publish an accepted PR."
+description: "Deliver an agreed brief: direct tasks by the lead, full tasks by TDD workers in .trees, independent review, serial integration, cleanup and one PR."
 metadata:
   author: "Soft Factory maintainers"
   spec_version: "1.0"
@@ -8,60 +8,59 @@ metadata:
 
 # Factory deliver
 
-Deliver one approved issue using native git and Copilot CLI facilities. These are
-instructions, not a runner; the only script launches one worker. Do not create
-orchestration scripts, scaffolding or a new documentation hierarchy.
+Deliver one committed brief using git and Copilot CLI. These are instructions, not
+a runner; the only script is `scripts/worker.sh`. Do not create orchestration
+scripts, scaffolding, side files or a new documentation hierarchy.
 
 ## Lead
 
-1. Resume from actual git/issue/PR/CI and live worker state. Preserve dirty work.
-   One lead owns the issue; another session must explicitly reconcile and take over.
-   Verify agreed scope, commands, identity/signing and architecture before dispatch.
-2. Select `ready` tasks from the brief whose dependencies are `integrated`. Work in
-   the existing devcontainer; branch every worker from the recorded integration head.
-3. Write `.trees/<task>.prompt.md` using
+1. Resume from actual git, `.trees/`, brief, issue, PR and CI state. Preserve dirty
+   work. Confirm the brief and `AGENTS.md` are committed; worktrees see only commits.
+2. Pick `ready` tasks whose dependencies are `integrated`, on the issue branch.
+3. Direct tier: do the task yourself on the issue branch, with its docs, run its
+   check and commit. No worker, no TDD, no per-task review.
+4. Full tier: write `.trees/<task>.prompt.md` using
    [format-implementer-prompt](assets/formats/format-implementer-prompt-v1.0.0.example.md),
-   then run this skill's `scripts/worker.sh start <task> <integration-head> <prompt>`.
-   It creates the worktree/branch and starts `copilot --yolo -p` in its own process
-   group, writing `.trees/<task>.pid` and `.log`. Run at most two. Use
-   `scripts/worker.sh stop <task>` to stop a worker and all its subprocesses.
-   Worktrees and YOLO are not security isolation.
-4. Record branch, base/head, PID and status in the task's `Worker`/`Status` fields.
-   Inspect actual committed diffs and obtain fresh-context task review through
-   `factory-accept`; a successful exit is not acceptance.
-5. Integrate passing, unchanged reviewed commits serially into the issue branch;
-   run current combined checks before unlocking dependants. Conflicts/fixes are new
-   code needing checks and independent review. Failed tasks block dependants; broken
-   integration stops dispatch until repaired.
-6. Reconcile approved plan changes and clear affected reviews. Never duplicate a live
-   worker or discard unfinished work. On interruption inspect surviving subprocesses,
-   not only the CLI PID; stop only identified owned processes before redispatch.
-   Do not leave detached services running. Remove only completed clean worktrees.
-7. Obtain independent final acceptance of the exact combined SHA with current full
-   checks. Preserve evidence in the existing work record/PR. Open/update one PR; merge
-   and release require explicit delegated policy. Report outcome and at most one
-   needed owner action. Do not claim the real-product pilot is complete from skill loading.
+   then run `scripts/worker.sh start <task> <integration-head> <prompt>`. At most two.
+   `scripts/worker.sh stop <task>` stops a worker and all its subprocesses.
+   Record branch, base/head and PID in the task's `Worker` field.
+5. When a worker exits, read its result and actual diff, then obtain fresh-context
+   review through `factory-accept`. A successful exit is not acceptance.
+6. Integrate passing, unchanged reviewed commits serially; run combined checks
+   before unlocking dependants. Conflict fixes are new code needing review.
+7. After integrating a task run `scripts/worker.sh clean <task>`: it removes the
+   worktree, merged branch, pid and prompt, and keeps the log until the PR merges.
+   Remove any file you created that is not part of the deliverable.
+8. Draft the PR description using
+   [format-pr-description](assets/formats/format-pr-description-v1.0.0.example.md),
+   obtain final `factory-accept` on the combined SHA and that draft (this covers
+   direct tasks), run `factory-harvest`, then open one PR. Post worker results,
+   verdicts and harvest proposals as PR comments, not commits. Merge and release
+   need the owner, whatever the change impact.
 
 ## Implementer
 
-Read your scoped task, design and relevant project instructions. Do not launch workers,
-merge, push, release or edit other worktrees. For suitable behaviour changes: observe
-one intended failing test, implement the smallest coherent change, observe pass, then
-refactor. Prefer meaningful integration tests; justify unsuitable TDD cases.
-
-Update affected tests/docs and observability within scope, run relevant real checks,
-commit with configured identity/signing, and reply with
-[format-implementer-result](assets/formats/format-implementer-result-v1.0.0.example.md). Escalate material behaviour/contract/dependency
-changes; routine internal details are delegated. Do not self-certify acceptance.
+Read your prompt, `AGENTS.md`, the brief and `docs/architecture/decisions.md`.
+Do not launch workers, merge, push, release or edit other worktrees. Observe one
+failing test, implement the smallest coherent change, observe pass, refactor.
+Update the ADR/component/docs pages listed in your task, plus their
+`decisions.md` rows, in the same commit. Run the task checks, commit with the
+configured identity, and reply with
+[format-implementer-result](assets/formats/format-implementer-result-v1.0.0.example.md),
+including `## Guesses`. Escalate material behaviour/contract/dependency changes.
 
 ## References
 
-Use `factory-design`, `factory-accept` and, for
-consequential discoveries, `factory-align`.
+1. [format-implementer-prompt](assets/formats/format-implementer-prompt-v1.0.0.example.md)
+2. [format-implementer-result](assets/formats/format-implementer-result-v1.0.0.example.md)
+3. [format-pr-description](assets/formats/format-pr-description-v1.0.0.example.md)
+4. Use `factory-design`, `factory-accept`, `factory-harvest`; return consequential
+   discoveries to `factory-align`.
 
 ## Skill layout
 
 - `SKILL.md`: lead and implementer instructions.
-- `scripts/worker.sh`: start or stop one worktree implementer (bash, no dependencies).
+- `scripts/worker.sh`: start, stop or clean one worktree implementer (bash, no dependencies).
 - `assets/formats/format-implementer-prompt-v1.0.0.example.md`: IMPLEMENTER_PROMPT_V1 contract.
 - `assets/formats/format-implementer-result-v1.0.0.example.md`: IMPLEMENTER_RESULT_V1 contract.
+- `assets/formats/format-pr-description-v1.0.0.example.md`: PR_DESCRIPTION_V1 contract.

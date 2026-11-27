@@ -2,7 +2,7 @@
 
 Scheduled Pocket transcript collector.
 
-Delivery skills in `.github/skills/` are vendored from jsburckhardt/toolio `soft-factory-v2` at `3d07eb5`.
+Delivery skills in `.github/skills/` and the `foreman` agent in `.github/agents/` are vendored from jsburckhardt/toolio `soft-factory-v3` at `bd0eaa7`.
 
 ## Collector: run-once native collection
 
