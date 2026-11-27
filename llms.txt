@@ -1,18 +1,26 @@
 # pocketpull
 
-> Run-once Go CLI that copies every Pocket recording's transcript, metadata and summaries into a local raw folder, for cron-driven archiving that feeds a downstream wiki agent.
+> pocketpull downloads your Pocket recordings (transcripts, metadata and summaries) into a local folder. Each run collects once and exits; cron runs it on a schedule.
 
-CGO-free static Linux amd64/arm64 binary; no runtime needed on the collection host. One-way archive: it never edits Pocket and never prunes local snapshots.
+- Written in Go; ships as a single static Linux binary (amd64/arm64) with nothing else to install.
+- Read-only towards Pocket: it never changes or deletes anything upstream, and never deletes local copies.
+- Configured with one YAML file plus flags; the API key comes from an environment variable or a private file.
 
 ## Docs
-- [Getting started](docs/getting-started.md): build from source, install a release, versions
-- [Usage](docs/usage/): configuration and credentials, collection behaviour (refresh, state, raw artifacts, retries)
-- [Operations](docs/operations/): cron scheduling, logs and exit status
+- [Getting started](docs/getting-started.md): what it collects, build from source, install a release, check the version
+- [Configuration and credentials](docs/usage/configuration.md): flags, config file lookup, YAML keys, API key sources
+- [Collection behaviour](docs/usage/collection.md): when recordings are refetched, where files are written, retries and recovery
+- [Cron scheduling](docs/operations/scheduling.md): set up unattended runs
+- [Logs and exit status](docs/operations/logging.md): log formats, summary fields, exit codes
 
 ## Architecture
-- [Decisions](docs/architecture/decisions.md): index of ADRs and components
+- [Decisions](docs/architecture/decisions.md): index of design decisions (ADRs) and components; read before changing code
+- [Collector component](docs/architecture/components/collector.md): `internal/collector` interface and guarantees
+- [CLI component](docs/architecture/components/cli.md): `internal/cli` interface and guarantees
 
 ## Optional
-- [Development](docs/development/): devcontainer, testing, packaging/CI/releases, telemetry
-- [Work briefs](docs/work/): delivered work briefs and their decisions
+- [Development workspace](docs/development/environment.md): devcontainer, authentication, commit signing
+- [Testing](docs/development/testing.md): local checks and what they cover
+- [Packaging, CI and releases](docs/development/ci-cd.md): build archives, CI checks, how releases are cut
+- [Telemetry](docs/development/telemetry.md): optional development telemetry and its privacy limits
 - [AGENTS.md](AGENTS.md): rules for agents changing this repository
