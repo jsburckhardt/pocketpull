@@ -1,0 +1,18 @@
+# pocketpull
+
+> Run-once Go CLI that copies every Pocket recording's transcript, metadata and summaries into a local raw folder, for cron-driven archiving that feeds a downstream wiki agent.
+
+CGO-free static Linux amd64/arm64 binary; no runtime needed on the collection host. One-way archive: it never edits Pocket and never prunes local snapshots.
+
+## Docs
+- [Getting started](docs/getting-started.md): build from source, install a release, versions
+- [Usage](docs/usage/): configuration and credentials, collection behaviour (refresh, state, raw artifacts, retries)
+- [Operations](docs/operations/): cron scheduling, logs and exit status
+
+## Architecture
+- [Decisions](docs/architecture/decisions.md): index of ADRs and components
+
+## Optional
+- [Development](docs/development/): devcontainer, testing, packaging/CI/releases, telemetry
+- [Work briefs](docs/work/): delivered work briefs and their decisions
+- [AGENTS.md](AGENTS.md): rules for agents changing this repository

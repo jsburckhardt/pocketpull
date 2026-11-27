@@ -14,3 +14,5 @@
   - [Telemetry](development/telemetry.md): optional OTLP export and its privacy limits.
 - Architecture: [decisions](architecture/decisions.md), index of ADRs and components; read first.
 - [Work briefs](work/): delivery briefs (`YYYYMMDD-<slug>.md`).
+
+The root [llms.txt](../llms.txt) is the short map for models.
