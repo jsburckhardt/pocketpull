@@ -1,7 +1,7 @@
 <!-- soft-factory-v3:begin -->
 ## How we deliver
 Start sessions with the `foreman` agent (`copilot --agent foreman` or `/agent`). It syncs state, picks the phase and runs
-the `factory-*` skills in `.github/skills/`. Vendored from jsburckhardt/toolio plugins/soft-factory-v3 at bd0eaa7.
+the `factory-*` skills in `.github/skills/`. Vendored from jsburckhardt/toolio plugins/soft-factory-v3 at 2c2659d.
 
 ## Docs
 - Keep README short: what it is, quickstart, links. Everything else goes in `docs/`.
