@@ -1,18 +1,20 @@
-<!-- soft-factory-v2:begin -->
+<!-- soft-factory-v3:begin -->
 ## How we deliver
-Skills: `.github/skills/`. Use them in this order:
-1. `factory-align`: grill before building; one issue-linked work brief; wait for the owner's "go".
-2. `factory-spike`: only when approved; bounded; written to `docs/spikes/`.
-3. `factory-slice`: vertical tasks in the brief.
-4. `factory-deliver`: one lead session; at most two implementers in `.trees/` via its `scripts/worker.sh`; serial integration; one PR per issue.
-5. `factory-accept`: independent review per task and for the final SHA.
-`factory-design` applies throughout: deep modules, small interfaces, integration tests first.
+Start sessions with the `foreman` agent (`copilot --agent foreman` or `/agent`). It syncs state, picks the phase and runs
+the `factory-*` skills in `.github/skills/`. Vendored from jsburckhardt/toolio plugins/soft-factory-v3 at bd0eaa7.
+
+## Docs
+- Keep README short: what it is, quickstart, links. Everything else goes in `docs/`.
+- Read `docs/architecture/decisions.md` first; it indexes ADRs and components.
+- Dated files are `YYYYMMDD-<slug>.md` (work, adr, spikes).
 
 ## Rules
 - Questions are not authorisation to change things.
 - The owner merges and releases unless delegated.
 - Never commit secrets; read credentials from the environment or owner-approved secret files.
-- When a task introduces or changes build/test/lint commands, update `## Commands` in the same task.
+- Tooling uses Go or plain bash; another runtime needs owner approval (existing Python scripts and the Node release-policy check are already approved).
+- Do not create unrequested side files; clean up what you create.
+- When a task changes build/test/lint commands, update `## Commands` in the same task.
 
 ## Commands
 - `just collector-check`: reject unformatted Go, run `go vet` and `go test -race`, and build CGO-free Linux amd64/arm64 binaries in a cleaned temporary directory.
@@ -32,4 +34,4 @@ Skills: `.github/skills/`. Use them in this order:
 - `devcontainer exec --workspace-folder . just dev-telemetry-smoke`: authenticated, container-only clean-profile Copilot/loopback OTLP protobuf check; permits only the automatic `enduser.pseudo.id` identity field and rejects other identity/content capture (see README).
 
 See README.md for collector usage, development authentication/signing, optional external telemetry, scope boundaries and prerequisites. Collector checks cover native builds and fixture-based collection, configuration/secrets, freshness/state/locking, bounded retries, partial outcomes and interruption/restart; live Pocket experiments, publication and independent acceptance are separate. Telemetry is off without a supplied endpoint. Under #2 D21, only automatic `enduser.pseudo.id` is permitted; it can correlate sessions and is not assumed anonymous. Keep identity/content capture disabled; all other enduser fields, names, raw IDs and OS/host identity remain prohibited.
-<!-- soft-factory-v2:end -->
+<!-- soft-factory-v3:end -->
